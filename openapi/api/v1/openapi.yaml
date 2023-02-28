@@ -1,0 +1,177 @@
+openapi: 3.0.1
+info:
+  title: "Ecosyste.ms: commits"
+  description: "An open API service providing security vulnerability metadata for many open source software ecosystems."
+  contact:
+    name: Ecosyste.ms
+    email: support@ecosyste.ms
+    url: https://ecosyste.ms 
+  version: 1.0.0
+  license:
+    name: CC-BY-SA-4.0
+    url: https://creativecommons.org/licenses/by-sa/4.0/
+externalDocs:
+  description: GitHub Repository
+  url: https://github.com/ecosyste-ms/commits
+servers:
+- url: https://commits.ecosyste.ms/api/v1
+paths:
+  /commits:
+    get: 
+      summary: "list commits"
+      operationId: "getcommits"
+      tags:
+        - commits
+      parameters:
+        - name: ecosystem
+          in: query
+          description: "Ecosystem to filter by"
+          required: false
+          schema:
+            type: string
+        - name: package_name
+          in: query
+          description: "Package to filter by"
+          required: false
+          schema:
+            type: string
+        - name: severity
+          in: query
+          description: "Severity to filter by"
+          required: false
+          schema:
+            type: string
+        - name: page
+          in: query
+          description: pagination page number 
+          required: false
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          description: Number of records to return 
+          required: false
+          schema:
+            type: integer
+        - name: created_after
+          in: query
+          description: filter by created_at after given time
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: updated_after
+          in: query
+          description: filter by updated_at after given time
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: sort
+          in: query
+          description: field to order results by
+          required: false
+          schema:
+            type: string
+        - name: order
+          in: query
+          description: direction to order results by
+          required: false
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Advisory'
+  /commits/packages:
+    get:
+      summary: "list packages that have commits"
+      operationId: "getcommitsPackages"
+      tags:
+        - commits
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Package'
+  /commits/{advisoryUUID}:
+    get:
+      summary: get a commits by uuid
+      operationId: getAdvisory
+      tags:
+        - commits
+      parameters:
+        - in: path
+          name: advisoryUUID
+          schema:
+            type: string
+          required: true
+          description: uuid of the advisory
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Advisory'
+components:
+  schemas:
+    Advisory:
+      type: object
+      properties:
+        uuid:
+          type: string
+        url:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        origin:
+          type: string
+        severity:
+          type: string
+        published_at:
+          type: string
+        withdrawn_at:
+          type: string
+        classification:
+          type: string
+        cvss_score:
+          type: number
+        cvss_vector:
+          type: string
+        references:
+          type: array
+          items:
+            type: string
+        source_kind:
+          type: string
+        identifiers:
+          type: array
+          items:
+            type: string
+        packages:
+          type: array
+          items:
+            type: object
+        created_at:
+          type: string
+        updated_at:
+          type: string
+    Package:
+      type: object
+      properties:
+        ecosystem:
+          type: string
+        package_name:
+          type: string

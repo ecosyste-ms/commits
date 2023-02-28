@@ -1,0 +1,8 @@
+<div class="container-sm">
+  <h1 class='mb-4'>
+    Recently scanned repositories
+  </h1>
+  
+  <%= render @repositories %>
+  <%== pagy_bootstrap_nav(@pagy) if @pagy.pages > 1 %>  
+</div>

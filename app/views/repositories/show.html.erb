@@ -1,0 +1,42 @@
+<% @meta_title = "#{@repository.full_name} committers | #{@host}" %>
+
+<div class="container-sm">
+  <h1>
+    <%= link_to @host, host_path(@host) %> /
+      
+    <%= link_to @repository.full_name, @repository.html_url, target: :_blank %> committers
+  </h1>
+
+  <p class="card-subtitle mb-2 text-muted"><i><small>
+    <% if @repository.last_synced_at %>
+      Last synced: <%= distance_of_time_in_words_to_now @repository.last_synced_at %> ago
+    <% end %>
+  </small></i></p>
+  <% if @repository.total_commits %>
+    <p>
+      Total Commits: <%= number_with_delimiter @repository.total_commits %><br>
+      Total Committers: <%= number_with_delimiter @repository.total_committers %><br>
+      Avg Commits per committer: <%= number_with_delimiter @repository.mean_commits.round(3) %><br>
+      Development Distribution Score (<a href='https://report.opensustain.tech/chapters/development-distribution-score.html' target="_blank">DDS</a>): <%= @repository.dds.round(3) %>
+    </p>
+  
+  <table class='table'>
+    <thead>
+      <tr>
+        <th>Name</th>
+        <th>Email</th>
+        <th>Commits</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% @repository.committers.each do |committer| %>
+        <tr>
+          <td><%= committer['name'] %></td>
+          <td><%= obfusticate_email(committer['email']) %></td>
+          <td><%= committer['count'] %></td>
+        </tr>
+      <% end %>
+    </tbody>
+  </table>
+  <% end %>
+</div>
