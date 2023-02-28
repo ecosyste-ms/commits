@@ -81,6 +81,8 @@ GEM
       concurrent-ruby (~> 1.0, >= 1.0.5)
       redis (>= 1.0, < 6)
     builder (3.2.4)
+    chronic_duration (0.10.6)
+      numerizer (~> 0.1.1)
     concurrent-ruby (1.2.2)
     connection_pool (2.3.0)
     counter_culture (3.3.0)
@@ -151,6 +153,7 @@ GEM
     nio4r (2.5.8)
     nokogiri (1.14.2-arm64-darwin)
       racc (~> 1.4)
+    numerizer (0.1.1)
     pagy (6.0.2)
     pg (1.4.6)
     pg_query (4.2.0)
@@ -229,6 +232,9 @@ GEM
       connection_pool (>= 2.3.0)
       rack (>= 2.2.4)
       redis-client (>= 0.11.0)
+    sidekiq-status (3.0.1)
+      chronic_duration
+      sidekiq (>= 6.0, < 8)
     sidekiq-unique-jobs (8.0.1)
       brpoplpush-redis_script (> 0.1.1, <= 2.0.0)
       concurrent-ruby (~> 1.0, >= 1.0.5)
@@ -296,6 +302,7 @@ DEPENDENCIES
   shoulda-context
   shoulda-matchers
   sidekiq
+  sidekiq-status
   sidekiq-unique-jobs
   sitemap_generator
   sprockets-rails

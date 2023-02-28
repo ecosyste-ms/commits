@@ -10,8 +10,9 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2023_02_28_110740) do
+ActiveRecord::Schema[7.0].define(version: 2023_02_28_170413) do
   # These are extensions that must be enabled in order to support this database
+  enable_extension "pgcrypto"
   enable_extension "plpgsql"
 
   create_table "hosts", force: :cascade do |t|
@@ -21,6 +22,17 @@ ActiveRecord::Schema[7.0].define(version: 2023_02_28_110740) do
     t.datetime "last_synced_at"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+  end
+
+  create_table "jobs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
+    t.string "sidekiq_id"
+    t.string "status"
+    t.string "url"
+    t.string "ip"
+    t.json "results"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["status"], name: "index_jobs_on_status"
   end
 
   create_table "repositories", force: :cascade do |t|
