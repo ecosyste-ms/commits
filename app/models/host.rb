@@ -5,12 +5,26 @@ class Host < ApplicationRecord
   validates :url, presence: true
   validates :kind, presence: true
 
+  def self.find_by_domain(domain)
+    Host.all.find { |host| host.domain == domain }
+  end
+
   def to_s
     name
   end
 
   def to_param
     name
+  end
+
+  def domain
+    Addressable::URI.parse(url).host
+  end
+
+  def sync_repository_async(full_name)
+    repo = self.repositories.find_or_create_by(full_name: full_name)
+    
+    repo.count_commits
   end
 
   def self.sync_all
