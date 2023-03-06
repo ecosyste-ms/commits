@@ -11,6 +11,8 @@ class RepositoriesController < ApplicationController
       redirect_to host_repository_path(@host, @repository)
     elsif path.present?
       @job = @host.sync_repository_async(path, request.remote_ip)
+      @repository = @host.repositories.find_by('lower(full_name) = ?', path.downcase)
+      raise ActiveRecord::RecordNotFound unless @repository
       redirect_to host_repository_path(@host, @repository)
     else
       raise ActiveRecord::RecordNotFound
