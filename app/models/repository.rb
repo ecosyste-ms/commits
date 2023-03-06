@@ -84,10 +84,9 @@ class Repository < ApplicationRecord
       update(last_synced_at: Time.now)
     else
       Dir.mktmpdir do |dir|
-        p dir
         `git clone -b #{default_branch} --single-branch #{git_clone_url} #{dir}`
         last_commit = `git -C #{dir} rev-parse HEAD`.strip
-        output = `git -C #{dir} shortlog -s -n -e --no-merges`      
+        output = `git -C #{dir} shortlog -s -n -e --no-merges HEAD`      
 
         committers = parse_commit_counts(output)
 
@@ -105,7 +104,6 @@ class Repository < ApplicationRecord
         update(updates)
       end
     end
-
     
   end
 
