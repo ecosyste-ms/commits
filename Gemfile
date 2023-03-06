@@ -30,6 +30,7 @@ gem 'sitemap_generator'
 gem 'sidekiq'
 gem 'sidekiq-unique-jobs'
 gem 'sidekiq-status'
+gem 'addressable'
 
 group :development, :test do
   gem "debug", platforms: %i[ mri mingw x64_mingw ]
