@@ -8,6 +8,10 @@ class Job < ApplicationRecord
     Job.where(status: ["queued", "working"]).find_each(&:check_status)
   end
 
+  def self.clean_up
+    Job.status(["complete",'error']).where('created_at < ?', 1.month.ago).delete_all
+  end
+
   def check_status
     return if sidekiq_id.blank?
     return if finished?
@@ -15,7 +19,11 @@ class Job < ApplicationRecord
   end
 
   def fetch_status
-    Sidekiq::Status.status(sidekiq_id).presence || 'error'
+    Sidekiq::Status.status(sidekiq_id).presence || 'pending'
+  end
+
+  def in_progress?
+    ['pending','queued', 'working'].include?(status)
   end
 
   def finished?

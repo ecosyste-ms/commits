@@ -28,6 +28,13 @@ class Repository < ApplicationRecord
     full_name.split('/').first
   end
 
+  def sync_async(remote_ip = '0.0.0.0')
+    job = Job.new(url: html_url, status: 'pending', ip: remote_ip)
+    if job.save
+      job.parse_commits_async
+    end
+  end
+
   def sync_details
     json = fetch_details
     return unless json
@@ -74,31 +81,32 @@ class Repository < ApplicationRecord
     last_commit = fetch_head_sha
 
     if last_synced_commit == last_commit
-      `rm -rf #{folder_name}`
-      updates = {
-        last_synced_at: Time.now
-      }
+      update(last_synced_at: Time.now)
     else
-      `git clone -b #{default_branch} --single-branch #{git_clone_url}`
-      last_commit = `git -C #{folder_name} rev-parse HEAD`.strip
-      output = `git -C #{folder_name} shortlog -s -n -e --no-merges`
-      committers = parse_commit_counts(output)
-      `rm -rf #{folder_name}`
+      Dir.mktmpdir do |dir|
+        p dir
+        `git clone -b #{default_branch} --single-branch #{git_clone_url} #{dir}`
+        last_commit = `git -C #{dir} rev-parse HEAD`.strip
+        output = `git -C #{dir} shortlog -s -n -e --no-merges`      
 
-      total_commits = committers.sum{|h| h[:count]}
+        committers = parse_commit_counts(output)
 
-      updates = {
-        committers: committers,
-        last_synced_commit: last_commit,
-        total_commits: total_commits,
-        total_committers: committers.length,
-        mean_commits: (total_commits.to_f / committers.length),
-        dds: 1 - (committers.first[:count].to_f / total_commits),
-        last_synced_at: Time.now
-      }
+        total_commits = committers.sum{|h| h[:count]}
+
+        updates = {
+          committers: committers,
+          last_synced_commit: last_commit,
+          total_commits: total_commits,
+          total_committers: committers.length,
+          mean_commits: (total_commits.to_f / committers.length),
+          dds: 1 - (committers.first[:count].to_f / total_commits),
+          last_synced_at: Time.now
+        }
+        update(updates)
+      end
     end
 
-    update(updates)
+    
   end
 
   def parse_commit_counts(output)

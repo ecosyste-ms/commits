@@ -1,16 +1,12 @@
 {
   "cron": [
     {
-      "command": "bundle exec rake commits:sync",
+      "command": "bundle exec rake jobs:check_statuses",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "command": "bundle exec rake jobs:cleanup",
       "schedule": "0 * * * *"
-    },
-    {
-      "command": "bundle exec rake packages:sync_registries",
-      "schedule": "0 8 * * *"
-    },
-    {
-      "command": "bundle exec rake sitemap:refresh",
-      "schedule": "30 * * * *"
     }
   ]
-}
+} 
