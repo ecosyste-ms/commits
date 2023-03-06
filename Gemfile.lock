@@ -68,6 +68,8 @@ GEM
       tzinfo (~> 2.0)
     addressable (2.8.1)
       public_suffix (>= 2.0.2, < 6.0)
+    appsignal (3.3.6)
+      rack
     autoprefixer-rails (10.4.13.0)
       execjs (~> 2)
     bindex (0.8.1)
@@ -299,6 +301,7 @@ PLATFORMS
 
 DEPENDENCIES
   addressable
+  appsignal
   bootsnap
   bootstrap
   counter_culture
