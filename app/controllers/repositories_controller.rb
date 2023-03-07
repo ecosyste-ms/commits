@@ -30,7 +30,7 @@ class RepositoriesController < ApplicationController
   end
 
   def index
-    @scope = Repository.where.not(last_synced_at: nil).where.not(total_commits: nil).order('last_synced_at DESC')
+    @scope = Repository.where.not(last_synced_at: nil).where.not(total_commits: nil).order('last_synced_at DESC').includes(:host)
     @pagy, @repositories = pagy(@scope)
   end
 end

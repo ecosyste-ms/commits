@@ -21,6 +21,11 @@ class Host < ApplicationRecord
     Addressable::URI.parse(url).host
   end
 
+  def display_kind?
+    return false if name.split('.').length == 2 && name.split('.').first.downcase == kind
+    name.downcase != kind
+  end
+
   def sync_repository_async(full_name, remote_ip = '0.0.0.0')
     repo = self.repositories.find_or_create_by(full_name: full_name)
     
@@ -29,6 +34,32 @@ class Host < ApplicationRecord
       job.parse_commits_async
     end
     job
+  end
+
+  def sync_recently_updated_repositories_async
+    conn = Faraday.new('https://repos.ecosyste.ms') do |f|
+      f.request :json
+      f.request :retry
+      f.response :json
+    end
+    
+    response = conn.get('/api/v1/hosts/' + name + '/repositories')
+    return nil unless response.success?
+    json = response.body
+
+    json.each do |repo|
+      puts "syncing #{repo['full_name']}"
+      sync_repository_async(repo['full_name'])
+    end
+  end 
+
+  def self.update_counts
+    Host.all.each do |host|
+      host.repositories_count = host.repositories.count
+      host.commits_count = host.repositories.sum(:total_commits)
+      host.contributors_count = host.repositories.sum(:total_committers)
+      host.save
+    end
   end
 
   def self.sync_all
