@@ -7,6 +7,10 @@
     {
       "command": "bundle exec rake jobs:cleanup",
       "schedule": "0 * * * *"
+    },
+    {
+      "command": "bundle exec rake hosts:update_counts",
+      "schedule": "*/15 * * * *"
     }
   ]
 } 
