@@ -3,7 +3,7 @@ class HostsController < ApplicationController
     @hosts = Host.all.where('repositories_count > 0 AND commits_count > 0').order('repositories_count DESC, commits_count DESC')
 
     @scope = Repository.where.not(last_synced_at: nil).where.not(total_commits: nil).order('last_synced_at DESC').includes(:host)
-    @pagy, @repositories = pagy_countless(@scope)
+    @pagy, @repositories = pagy_countless(@scope, items: 10)
   end
 
   def show
