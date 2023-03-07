@@ -1,1 +1,1 @@
-json.extract! host, :name, :url, :kind
+json.extract! host, :name, :url, :kind, :last_synced_at, :repositories_count, :commits_count

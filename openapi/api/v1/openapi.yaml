@@ -1,7 +1,7 @@
 openapi: 3.0.1
 info:
   title: "Ecosyste.ms: commits"
-  description: "An open API service providing security vulnerability metadata for many open source software ecosystems."
+  description: "An open API service providing commit metadata for open source projects. "
   contact:
     name: Ecosyste.ms
     email: support@ecosyste.ms
@@ -16,31 +16,91 @@ externalDocs:
 servers:
 - url: https://commits.ecosyste.ms/api/v1
 paths:
-  /commits:
-    get: 
-      summary: "list commits"
-      operationId: "getcommits"
-      tags:
-        - commits
+  /repositories/lookup:
+    get:
+      summary: "Lookup repository metadata"
+      operationId: "repositoriesLookup"
       parameters:
-        - name: ecosystem
+        - name: url
           in: query
-          description: "Ecosystem to filter by"
-          required: false
+          description: "The URL of the repository to lookup"
+          required: true
           schema:
             type: string
-        - name: package_name
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Repository'
+  /hosts:
+    get:
+      summary: list registies
+      operationId: getRegistries
+      parameters:
+        - name: page
           in: query
-          description: "Package to filter by"
+          description: pagination page number 
           required: false
           schema:
-            type: string
-        - name: severity
+            type: integer
+        - name: per_page
           in: query
-          description: "Severity to filter by"
+          description: Number of records to return 
           required: false
           schema:
+            type: integer
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Host'
+  /hosts/{hostName}:
+    get:
+      summary: get a host by name
+      operationId: getHost
+      parameters:
+        - in: path
+          name: hostName
+          schema:
             type: string
+          required: true
+          description: name of host
+        - name: page
+          in: query
+          description: pagination page number 
+          required: false
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          description: Number of records to return 
+          required: false
+          schema:
+            type: integer
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Host'
+  /hosts/{hostName}/repositories:
+    get:
+      summary: get a list of repositories from a host
+      operationId: getHostRepositories
+      parameters:
+        - in: path
+          name: hostName
+          schema:
+            type: string
+          required: true
+          description: name of host
         - name: page
           in: query
           description: pagination page number 
@@ -87,91 +147,52 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Advisory'
-  /commits/packages:
-    get:
-      summary: "list packages that have commits"
-      operationId: "getcommitsPackages"
-      tags:
-        - commits
-      responses:
-        200:
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: '#/components/schemas/Package'
-  /commits/{advisoryUUID}:
-    get:
-      summary: get a commits by uuid
-      operationId: getAdvisory
-      tags:
-        - commits
-      parameters:
-        - in: path
-          name: advisoryUUID
-          schema:
-            type: string
-          required: true
-          description: uuid of the advisory
-      responses:
-        200:
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Advisory'
+                  $ref: '#/components/schemas/Repository'
 components:
   schemas:
-    Advisory:
+    Host:
       type: object
       properties:
-        uuid:
+        name:
           type: string
         url:
           type: string
-        title:
+        kind:
           type: string
-        description:
+        repositories_count:
+          type: integer
+        last_synced_at:
           type: string
-        origin:
+          format: date-time
+        commits_count:
+          type: integer
+    Repository:
+      type: object
+      properties:
+        full_name:
           type: string
-        severity:
+        default_branch:
           type: string
-        published_at:
-          type: string
-        withdrawn_at:
-          type: string
-        classification:
-          type: string
-        cvss_score:
-          type: number
-        cvss_vector:
-          type: string
-        references:
-          type: array
-          items:
-            type: string
-        source_kind:
-          type: string
-        identifiers:
-          type: array
-          items:
-            type: string
-        packages:
+        committers:
           type: array
           items:
             type: object
-        created_at:
+        total_commits:
+          type: integer
+        total_committers:
+          type: integer
+        mean_commits:
+          type: number
+        dds:
+          type: number
+        last_synced_at:
+          type: string
+          format: date-time
+        last_synced_commit:
           type: string
         updated_at:
           type: string
-    Package:
-      type: object
-      properties:
-        ecosystem:
+          format: date-time
+        created_at:
           type: string
-        package_name:
-          type: string
+          format: date-time
