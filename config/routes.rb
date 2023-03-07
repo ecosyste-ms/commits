@@ -36,5 +36,5 @@ Rails.application.routes.draw do
   get '/422', to: 'errors#unprocessable'
   get '/500', to: 'errors#internal'
 
-  root "repositories#index"
+  root "hosts#index"
 end
