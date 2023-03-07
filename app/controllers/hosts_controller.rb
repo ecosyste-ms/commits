@@ -1,6 +1,6 @@
 class HostsController < ApplicationController
   def index
-    @hosts = Host.all.where('repositories_count > 0').order('repositories_count DESC')
+    @hosts = Host.all.where('repositories_count > 0 AND commits_count > 0').order('repositories_count DESC, commits_count DESC')
   end
 
   def show
