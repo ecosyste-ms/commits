@@ -84,7 +84,7 @@ class Repository < ApplicationRecord
       update(last_synced_at: Time.now)
     else
       Dir.mktmpdir do |dir|
-        `git clone -b #{default_branch} --single-branch #{git_clone_url} #{dir}`
+        `GIT_TERMINAL_PROMPT=0 git clone -b #{default_branch} --single-branch #{git_clone_url} #{dir}`
         last_commit = `git -C #{dir} rev-parse HEAD`.strip
         output = `git -C #{dir} shortlog -s -n -e --no-merges HEAD`      
 
