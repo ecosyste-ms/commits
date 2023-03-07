@@ -54,12 +54,14 @@ class Host < ApplicationRecord
   end 
 
   def self.update_counts
-    Host.all.each do |host|
-      host.repositories_count = host.repositories.count
-      host.commits_count = host.repositories.sum(:total_commits)
-      host.contributors_count = host.repositories.sum(:total_committers)
-      host.save
-    end
+    Host.all.each(&:update_counts)
+  end
+
+  def update_counts
+    self.repositories_count = repositories.count
+    self.commits_count = repositories.sum(:total_commits)
+    self..contributors_count = repositories.sum(:total_committers)
+    save
   end
 
   def self.sync_all
