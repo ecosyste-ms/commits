@@ -148,6 +148,30 @@ paths:
                 type: array
                 items:
                   $ref: '#/components/schemas/Repository'
+  /hosts/{hostName}/repositories/{repoName}:
+    get:
+      summary: get a repository from a host
+      operationId: getHostRepository
+      parameters:
+        - in: path
+          name: hostName
+          schema:
+            type: string
+          required: true
+          description: name of host
+        - in: path
+          name: repoName
+          schema:
+            type: string
+          required: true
+          description: name of repository
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Repository'
 components:
   schemas:
     Host:
