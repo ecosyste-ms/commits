@@ -118,11 +118,31 @@ class Repository < ApplicationRecord
   def parse_commit_counts(output)
     # parse the output of the git command
     # return an array of hashes with the author and commit count
-    output.split("\n").map do |line|
+    lines = output.split("\n").map do |line|
       count, author = line.split("\t")
       name, email = author.split("<")
       email.gsub!(/[<>]/, '')
       { name: name.strip, email: email, count: count.to_i }
     end
+
+    lines.group_by{|h| h[:email]}.map do |email, lines|
+      { name: lines.first[:name], email: email, count: lines.sum{|h| h[:count]} }
+    end
+  end
+
+  def group_commits_by_email
+    # temporary method to group commits by email
+    return unless committers
+    updated_committers = committers.group_by{|h| h["email"]}.map do |email, lines|
+      { name: lines.first["name"], email: email, count: lines.sum{|h| h["count"]} }
+    end
+
+    updates = {
+      committers: updated_committers,
+      total_committers: updated_committers.length,
+      mean_commits: (total_commits.to_f / updated_committers.length),
+      dds: 1 - (updated_committers.first["count"].to_f / total_commits),
+    }
+    update(updates)
   end
 end
