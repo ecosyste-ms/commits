@@ -57,7 +57,8 @@ class Job < ApplicationRecord
     json = response.body
 
     host = Host.find_by(name: json['host']['name'])
-    repo = host.repositories.find_or_create_by(full_name: json['full_name'])
+    repo = host.repositories.find_by('lower(full_name) = ?', json['full_name'].downcase)
+    repo = host.repositories.create(full_name: json['full_name']) if repo.nil?
     
     repo.count_commits
     
