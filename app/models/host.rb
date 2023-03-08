@@ -5,6 +5,8 @@ class Host < ApplicationRecord
   validates :url, presence: true
   validates :kind, presence: true
 
+  scope :visible, -> { where('repositories_count > 0 AND commits_count > 0') }
+
   def self.find_by_domain(domain)
     Host.all.find { |host| host.domain == domain }
   end

@@ -3,6 +3,10 @@ class Repository < ApplicationRecord
 
   validates :full_name, presence: true
 
+  scope :visible, -> { where.not(last_synced_at: nil).where.not(total_commits: nil) }
+  scope :created_after, ->(date) { where('created_at > ?', date) }
+  scope :updated_after, ->(date) { where('updated_at > ?', date) }
+
   def to_s
     full_name
   end

@@ -1,17 +1,17 @@
 class HostsController < ApplicationController
   def index
-    @hosts = Host.all.where('repositories_count > 0 AND commits_count > 0').order('repositories_count DESC, commits_count DESC')
+    @hosts = Host.all.visible.order('repositories_count DESC, commits_count DESC')
 
-    @scope = Repository.where.not(last_synced_at: nil).where.not(total_commits: nil).order('last_synced_at DESC').includes(:host)
+    @scope = Repository.visible.order('last_synced_at DESC').includes(:host)
     @pagy, @repositories = pagy_countless(@scope, items: 10)
   end
 
   def show
     @host = Host.find_by_name!(params[:id])
 
-    scope = @host.repositories.where.not(last_synced_at:nil)
+    scope = @host.repositories.visible
 
-    sort = params[:sort].presence || 'updated_at'
+    sort = params[:sort].presence || 'last_synced_at'
     if params[:order] == 'asc'
       scope = scope.order(Arel.sql(sort).asc.nulls_last)
     else

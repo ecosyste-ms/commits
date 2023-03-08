@@ -2,7 +2,7 @@ require 'test_helper'
 
 class ApiV1HostsControllerTest < ActionDispatch::IntegrationTest
   setup do
-    @host = Host.create(name: 'GitHub', url: 'https://github.com', kind: 'github')
+    @host = Host.create(name: 'GitHub', url: 'https://github.com', kind: 'github', last_synced_at: Time.now, repositories_count: 1, commits_count: 1)
   end
 
   test 'lists hosts' do

@@ -1,6 +1,6 @@
 class Api::V1::HostsController < Api::V1::ApplicationController
   def index
-    @hosts = Host.all.order('repositories_count DESC')
+    @hosts = Host.all.visible.order('repositories_count DESC, commits_count DESC')
   end
 
   def show
