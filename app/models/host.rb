@@ -61,9 +61,9 @@ class Host < ApplicationRecord
   end
 
   def update_counts
-    self.repositories_count = repositories.count
-    self.commits_count = repositories.sum(:total_commits)
-    self..contributors_count = repositories.sum(:total_committers)
+    self.repositories_count = repositories.visible.count
+    self.commits_count = repositories.visible.sum(:total_commits)
+    self.contributors_count = repositories.visible.sum(:total_committers)
     save
   end
 
