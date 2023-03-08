@@ -44,11 +44,15 @@ class Repository < ApplicationRecord
   end
 
   def repos_url
+    "https://repos.ecosyste.ms/hosts/#{host.name}/repositories/#{full_name}"
+  end
+
+  def repos_api_url
     "https://repos.ecosyste.ms/api/v1/hosts/#{host.name}/repositories/#{full_name}"
   end
 
   def fetch_details
-    conn = Faraday.new(repos_url) do |f|
+    conn = Faraday.new(repos_api_url) do |f|
       f.request :json
       f.request :retry
       f.response :json

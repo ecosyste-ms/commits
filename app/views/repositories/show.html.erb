@@ -16,7 +16,9 @@
         Total Commits: <%= number_with_delimiter @repository.total_commits %><br>
         Total Committers: <%= number_with_delimiter @repository.total_committers %><br>
         Avg Commits per committer: <%= number_with_delimiter @repository.mean_commits.round(3) %><br>
-        Development Distribution Score (<a href='https://report.opensustain.tech/chapters/development-distribution-score.html' target="_blank">DDS</a>): <%= @repository.dds.round(3) %>
+        Development Distribution Score (<a href='https://report.opensustain.tech/chapters/development-distribution-score.html' target="_blank">DDS</a>): <%= @repository.dds.round(3) %><br/>
+        More repo stats: <%= link_to @repository.repos_url, @repository.repos_url, target: :_blank %><br>
+        JSON API: <%= link_to api_v1_host_repository_url(@host, @repository), api_v1_host_repository_url(@host, @repository), target: :_blank %>
       </p>
     
     <table class='table'>
