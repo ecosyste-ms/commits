@@ -141,7 +141,7 @@ class Repository < ApplicationRecord
       committers: updated_committers,
       total_committers: updated_committers.length,
       mean_commits: (total_commits.to_f / updated_committers.length),
-      dds: 1 - (updated_committers.first["count"].to_f / total_commits),
+      dds: 1 - (updated_committers.first[:count].to_f / total_commits),
     }
     update(updates)
   end
