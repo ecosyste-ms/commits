@@ -10,10 +10,13 @@ module ApplicationHelper
   end
 
   def obfusticate_email(email)
-    return unless email
+    return unless email    
     email.split('@').map do |part|
-      # part.gsub(/./, '*') 
-      part.tap { |p| p[1...-1] = "****" }
+      begin
+        part.tap { |p| p[1...-1] = "****" }
+      rescue
+        '****'
+      end
     end.join('@')
   end
 end
