@@ -7,6 +7,10 @@ class Repository < ApplicationRecord
   scope :created_after, ->(date) { where('created_at > ?', date) }
   scope :updated_after, ->(date) { where('updated_at > ?', date) }
 
+  def self.sync_least_recently_synced
+    Repository.order('last_synced_at ASC').limit(1_000).each(&:sync_async)
+  end
+
   def to_s
     full_name
   end
