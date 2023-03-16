@@ -32,6 +32,7 @@ gem 'sidekiq-unique-jobs'
 gem 'sidekiq-status'
 gem 'addressable'
 gem 'appsignal'
+gem "groupdate"
 
 group :development, :test do
   gem "debug", platforms: %i[ mri mingw x64_mingw ]
