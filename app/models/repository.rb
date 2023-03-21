@@ -8,7 +8,7 @@ class Repository < ApplicationRecord
   scope :updated_after, ->(date) { where('updated_at > ?', date) }
 
   def self.sync_least_recently_synced
-    Repository.order('last_synced_at ASC').limit(2_000).each(&:sync_async)
+    Repository.order('last_synced_at ASC').limit(2_500).each(&:sync_async)
   end
 
   def to_s
