@@ -131,7 +131,7 @@ class Repository < ApplicationRecord
 
     lines.group_by{|h| h[:email]}.map do |email, lines|
       { name: lines.first[:name], email: email, count: lines.sum{|h| h[:count]} }
-    end
+    end.sort_by{|h| h[:count]}.reverse
   end
 
   def group_commits_by_email
