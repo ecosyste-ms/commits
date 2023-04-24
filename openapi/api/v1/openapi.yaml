@@ -209,6 +209,18 @@ components:
           type: number
         dds:
           type: number
+        past_year_committers:
+          type: array
+          items:
+            type: object
+        past_year_total_commits:
+          type: integer
+        past_year_total_committers:
+          type: integer
+        past_year_mean_commits:
+          type: number
+        past_year_dds:
+          type: number
         last_synced_at:
           type: string
           format: date-time

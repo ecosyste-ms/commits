@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2023_03_08_155100) do
+ActiveRecord::Schema[7.0].define(version: 2023_04_24_091857) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -51,6 +51,11 @@ ActiveRecord::Schema[7.0].define(version: 2023_03_08_155100) do
     t.string "last_synced_commit"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.json "past_year_committers"
+    t.integer "past_year_total_commits"
+    t.integer "past_year_total_committers"
+    t.float "past_year_mean_commits"
+    t.float "past_year_dds"
     t.index "host_id, lower((full_name)::text)", name: "index_repositories_on_host_id_lower_full_name", unique: true
   end
 

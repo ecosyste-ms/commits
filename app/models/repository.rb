@@ -92,7 +92,7 @@ class Repository < ApplicationRecord
     sync_details
     last_commit = fetch_head_sha
 
-    if last_synced_commit == last_commit
+    if !past_year_committers.nil? && last_synced_commit == last_commit
       update(last_synced_at: Time.now)
     else
       Dir.mktmpdir do |dir|
@@ -100,9 +100,24 @@ class Repository < ApplicationRecord
         last_commit = `git -C #{dir} rev-parse HEAD`.strip
         output = `git -C #{dir} shortlog -s -n -e --no-merges HEAD`      
 
+        past_year_output = `git -C #{dir} shortlog -s -n -e --no-merges --since="1 year ago" HEAD`
+
         committers = parse_commit_counts(output)
 
+        past_year_committers = parse_commit_counts(past_year_output)
+
         total_commits = committers.sum{|h| h[:count]}
+
+        past_year_total_commits = past_year_committers.sum{|h| h[:count]}
+
+        if past_year_committers.first
+          past_year_dds = 1 - (past_year_committers.first[:count].to_f / past_year_total_commits)
+          past_year_mean_commits = (past_year_total_commits.to_f / past_year_committers.length)
+        else
+          past_year_dds = 0
+          past_year_mean_commits = 0
+        end
+
 
         updates = {
           committers: committers,
@@ -111,6 +126,11 @@ class Repository < ApplicationRecord
           total_committers: committers.length,
           mean_commits: (total_commits.to_f / committers.length),
           dds: 1 - (committers.first[:count].to_f / total_commits),
+          past_year_committers: past_year_committers,
+          past_year_total_commits: past_year_total_commits,
+          past_year_total_committers: past_year_committers.length,
+          past_year_mean_commits: past_year_mean_commits,
+          past_year_dds: past_year_dds,
           last_synced_at: Time.now
         }
         update(updates)
