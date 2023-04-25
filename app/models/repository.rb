@@ -3,12 +3,13 @@ class Repository < ApplicationRecord
 
   validates :full_name, presence: true
 
-  scope :visible, -> { where.not(last_synced_at: nil).where.not(total_commits: nil) }
+  scope :active, -> { where(status: nil) }
+  scope :visible, -> { active.where.not(last_synced_at: nil).where.not(total_commits: nil) }
   scope :created_after, ->(date) { where('created_at > ?', date) }
   scope :updated_after, ->(date) { where('updated_at > ?', date) }
 
   def self.sync_least_recently_synced
-    Repository.order('last_synced_at ASC').limit(2_500).each(&:sync_async)
+    Repository.active.order('last_synced_at ASC').limit(2_500).each(&:sync_async)
   end
 
   def to_s
@@ -44,11 +45,23 @@ class Repository < ApplicationRecord
   end
 
   def sync_details
-    json = fetch_details
-    return unless json
+    conn = Faraday.new(repos_api_url) do |f|
+      f.request :json
+      f.request :retry
+      f.response :json
+    end
+    response = conn.get
+    if response.status == 404
+      self.status = 'not_found'
+      self.save
+      return
+    end
+    return if response.status != 200
+    json = response.body
 
+    self.status = json['status']
     self.default_branch = json['default_branch']
-    self.save
+    self.save    
   end
 
   def repos_url
@@ -57,17 +70,6 @@ class Repository < ApplicationRecord
 
   def repos_api_url
     "https://repos.ecosyste.ms/api/v1/hosts/#{host.name}/repositories/#{full_name}"
-  end
-
-  def fetch_details
-    conn = Faraday.new(repos_api_url) do |f|
-      f.request :json
-      f.request :retry
-      f.response :json
-    end
-    response = conn.get
-    return nil unless response.success?
-    json = response.body
   end
 
   def folder_name
@@ -90,6 +92,7 @@ class Repository < ApplicationRecord
 
   def count_commits
     sync_details
+    return if status == 'not_found'
     last_commit = fetch_head_sha
 
     if !past_year_committers.nil? && last_synced_commit == last_commit
