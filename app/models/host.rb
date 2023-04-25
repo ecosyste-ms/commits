@@ -82,6 +82,7 @@ class Host < ApplicationRecord
       Host.find_or_create_by(name: host['name']).tap do |r|
         r.url = host['url']
         r.kind = host['kind']
+        r.icon_url = host['icon_url']
         r.last_synced_at = Time.now
         r.save
       end
