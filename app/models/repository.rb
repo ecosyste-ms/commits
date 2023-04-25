@@ -98,6 +98,7 @@ class Repository < ApplicationRecord
     if !past_year_committers.nil? && last_synced_commit == last_commit
       update(last_synced_at: Time.now)
     else
+      begin
       Dir.mktmpdir do |dir|
         `GIT_TERMINAL_PROMPT=0 git clone -b #{default_branch} --single-branch #{git_clone_url} #{dir}`
         last_commit = `git -C #{dir} rev-parse HEAD`.strip
@@ -137,6 +138,9 @@ class Repository < ApplicationRecord
           last_synced_at: Time.now
         }
         update(updates)
+      end
+      rescue
+        # TODO record error in clone (likely missing repo but also maybe host downtime)
       end
     end
     
