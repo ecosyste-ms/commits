@@ -33,7 +33,7 @@ gem 'sidekiq-status'
 gem 'addressable'
 gem 'appsignal'
 gem "groupdate"
-gem 'google-protobuf', '3.23.2'
+gem 'google-protobuf', '3.23.3'
 
 group :development, :test do
   gem "debug", platforms: %i[ mri mingw x64_mingw ]
