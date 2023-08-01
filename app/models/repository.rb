@@ -176,4 +176,80 @@ class Repository < ApplicationRecord
     }
     update(updates)
   end
+
+  def fetch_login(email)
+    return nil if host.name != 'GitHub'
+    existing_login = host.committers.email(email).first.try(:login)
+    return existing_login if existing_login
+    # TODO should be host agnostic
+    commit = api_client.list_commits(full_name, author: email, per_page: 1).first
+    return nil if commit.nil?
+    login = commit.author.try(:login)
+    # find committer by login and add email to committer
+    committer = host.committers.find_by(login: login)
+    if committer
+      committer.emails << email
+      committer.save
+    else
+      committer = host.committers.create(login: login, emails: [email])
+    end
+    committer.login
+  rescue
+    nil
+  end
+
+  def fetch_all_logins
+    return nil if host.name != 'GitHub'
+    committers.each do |committer|
+      next if committer['login'].present?
+      committer['login'] = fetch_login(committer['email'])
+    end
+    past_year_committers.each do |committer|
+      next if committer['login'].present?
+      committer['login'] = fetch_login(committer['email'])
+    end
+    update(committers: committers, past_year_committers: past_year_committers)
+  end
+
+  def committer_url(login)
+    "#{host.url}/#{login}"
+  end
+
+  def token_set_key
+    "github_tokens"
+  end
+
+  def list_tokens
+    REDIS.smembers(token_set_key)
+  end
+
+  def fetch_random_token
+    REDIS.srandmember(token_set_key)
+  end
+
+  def add_tokens(tokens)
+    REDIS.sadd(token_set_key, tokens)
+  end
+
+  def remove_token(token)
+    REDIS.srem(token_set_key, token)
+  end
+
+  def check_tokens
+    list_tokens.each do |token|
+      begin
+        api_client(token).rate_limit!
+      rescue Octokit::Unauthorized, Octokit::AccountSuspended
+        puts "Removing token #{token}"
+        remove_token(token)
+      end
+    end
+  end
+
+  private
+
+  def api_client(token = nil, options = {})
+    token = fetch_random_token if token.nil?
+    Octokit::Client.new({access_token: token, auto_paginate: true}.merge(options))
+  end
 end

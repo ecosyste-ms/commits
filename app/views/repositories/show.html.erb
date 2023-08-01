@@ -50,7 +50,7 @@
             <tbody>
               <% @repository.committers.each do |committer| %>
                 <tr>
-                  <td><%= committer['name'] %></td>
+                  <td><%= link_to_unless committer['login'].blank?, committer['name'], @repository.committer_url(committer['login']) %></td>
                   <td><%= obfusticate_email(committer['email']) %></td>
                   <td><%= committer['count'] %></td>
                 </tr>
@@ -78,7 +78,7 @@
               <tbody>
                 <% @repository.past_year_committers.each do |committer| %>
                   <tr>
-                    <td><%= committer['name'] %></td>
+                    <td><%= link_to_unless committer['login'].blank?, committer['name'], @repository.committer_url(committer['login']) %></td>
                     <td><%= obfusticate_email(committer['email']) %></td>
                     <td><%= committer['count'] %></td>
                   </tr>

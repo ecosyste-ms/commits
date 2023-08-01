@@ -1,5 +1,6 @@
 class Host < ApplicationRecord
   has_many :repositories
+  has_many :committers
 
   validates :name, presence: true, uniqueness: true
   validates :url, presence: true

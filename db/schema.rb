@@ -10,10 +10,21 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2023_04_25_160218) do
+ActiveRecord::Schema[7.0].define(version: 2023_07_31_164302) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
+
+  create_table "committers", force: :cascade do |t|
+    t.integer "host_id"
+    t.string "emails", array: true
+    t.string "login"
+    t.integer "commits_count", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["emails"], name: "index_committers_on_emails", using: :gin
+    t.index ["host_id"], name: "index_committers_on_host_id"
+  end
 
   create_table "hosts", force: :cascade do |t|
     t.string "name"
