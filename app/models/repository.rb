@@ -153,12 +153,20 @@ class Repository < ApplicationRecord
       count, author = line.split("\t")
       name, email = author.split("<")
       email.gsub!(/[<>]/, '')
-      { name: name.strip, email: email, count: count.to_i }
+      login = fetch_existing_login(email)
+      { name: name.strip, email: email, login: login, count: count.to_i }
     end
 
-    lines.group_by{|h| h[:email]}.map do |email, lines|
-      { name: lines.first[:name], email: email, count: lines.sum{|h| h[:count]} }
+    c = lines.group_by{|h| h[:email]}.map do |email, lines|
+      { name: lines.first[:name], email: email, login: lines.first[:login], count: lines.sum{|h| h[:count]} }
     end.sort_by{|h| h[:count]}.reverse
+
+    c_with_login = c.select{|h| h[:login].present? }
+    c_without_login = c.select{|h| h[:login].blank? }
+    grouped_logins = c_with_login.group_by{|h| h[:login]}.map do |login, lines|
+      { name: lines.first[:name], email: lines.first[:email], login: login, count: lines.sum{|h| h[:count]} }
+    end
+    (grouped_logins + c_without_login).sort_by{|h| h[:count]}.reverse
   end
 
   def group_commits_by_login
@@ -176,7 +184,6 @@ class Repository < ApplicationRecord
       mean_commits: (total_commits.to_f / updated_committers.length),
       dds: 1 - (updated_committers.first['count'].to_f / total_commits),
     }
-
 
     if past_year_committers && past_year_committers.length > 0
       updated_past_year_committers_with_login = past_year_committers.select{|h| h['login'].present? }.group_by{|h| h["login"]}.map do |login, lines|
@@ -246,6 +253,21 @@ class Repository < ApplicationRecord
     update(committers: committers, past_year_committers: past_year_committers)
 
     group_commits_by_login
+  end
+
+  def fetch_existing_login(email)
+    return nil if host.name != 'GitHub'
+
+    return nil if REDIS.sismember('github_emails_nil', email)
+
+    if email.include?('@users.noreply.github.com')
+      login = email.gsub!('@users.noreply.github.com', '').split('+').last
+      return login
+    end
+
+    existing_login = host.committers.email(email).first.try(:login)
+    return existing_login if existing_login
+    nil
   end
 
   def committer_url(login)
