@@ -270,6 +270,28 @@ class Repository < ApplicationRecord
     nil
   end
 
+  def fetch_all_existing_logins
+    return nil if host.name != 'GitHub'
+    return if committers.nil?
+
+    committers.each do |committer|
+      next if committer['login'].present?
+      committer['login'] = fetch_existing_login(committer['email'])
+    end
+
+    if past_year_committers
+      past_year_committers.each do |committer|
+        next if committer['login'].present?
+        committer['login'] = fetch_existing_login(committer['email'])
+      end
+    end
+
+    update(committers: committers, past_year_committers: past_year_committers)
+
+    group_commits_by_login
+  end
+
+
   def committer_url(login)
     "#{host.url}/#{login}"
   end
