@@ -161,24 +161,43 @@ class Repository < ApplicationRecord
     end.sort_by{|h| h[:count]}.reverse
   end
 
-  def group_commits_by_email
-    # temporary method to group commits by email
+  def group_commits_by_login
     return unless committers
-    updated_committers = committers.group_by{|h| h["email"]}.map do |email, lines|
-      { name: lines.first["name"], email: email, count: lines.sum{|h| h["count"]} }
+    updated_committers_with_login = committers.select{|h| h['login'].present? }.group_by{|h| h["login"]}.map do |login, lines|
+      { 'name' => lines.first["name"], 'email' => lines.first['email'], 'login' => login, 'count' => lines.sum{|h| h["count"]} }
     end
+
+    updated_committers = (committers.select{|h| h['login'].blank? } + updated_committers_with_login).sort_by{|h| h['count']}.reverse
+
 
     updates = {
       committers: updated_committers,
       total_committers: updated_committers.length,
       mean_commits: (total_commits.to_f / updated_committers.length),
-      dds: 1 - (updated_committers.first[:count].to_f / total_commits),
+      dds: 1 - (updated_committers.first['count'].to_f / total_commits),
     }
+
+
+    if past_year_committers && past_year_committers.length > 0
+      updated_past_year_committers_with_login = past_year_committers.select{|h| h['login'].present? }.group_by{|h| h["login"]}.map do |login, lines|
+        { 'name' => lines.first["name"], 'email' => lines.first['email'], 'login' => login, 'count' => lines.sum{|h| h["count"]} }
+      end
+  
+      updated_past_year_committers = (past_year_committers.select{|h| h['login'].blank? } + updated_past_year_committers_with_login).sort_by{|h| h['count']}.reverse
+
+      updates[:past_year_committers] = updated_past_year_committers
+      updates[:past_year_total_committers] = updated_past_year_committers.length
+      updates[:past_year_mean_commits] = (past_year_total_commits.to_f / updated_past_year_committers.length)
+      updates[:past_year_dds] = 1 - (updated_past_year_committers.first['count'].to_f / past_year_total_commits)
+    end
+
     update(updates)
   end
 
   def fetch_login(email)
     return nil if host.name != 'GitHub'
+
+    return if REDIS.sismember('github_emails_nil', email)
 
     if email.include?('@users.noreply.github.com')
       login = email.gsub!('@users.noreply.github.com', '').split('+').last
@@ -191,6 +210,8 @@ class Repository < ApplicationRecord
     commit = api_client.list_commits(full_name, author: email, per_page: 1).first
     return nil if commit.nil?
     login = commit.author.try(:login)
+    REDIS.sadd('github_emails_nil', email) if login.nil?
+    return nil if login.nil?
     # find committer by login and add email to committer
     committer = host.committers.find_by(login: login)
     if committer
@@ -223,6 +244,8 @@ class Repository < ApplicationRecord
     end
 
     update(committers: committers, past_year_committers: past_year_committers)
+
+    group_commits_by_login
   end
 
   def committer_url(login)
