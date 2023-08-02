@@ -179,6 +179,12 @@ class Repository < ApplicationRecord
 
   def fetch_login(email)
     return nil if host.name != 'GitHub'
+
+    if email.include?('@users.noreply.github.com')
+      login = email.gsub!('@users.noreply.github.com', '').split('+').last
+      return login
+    end
+
     existing_login = host.committers.email(email).first.try(:login)
     return existing_login if existing_login
     # TODO should be host agnostic
@@ -194,20 +200,28 @@ class Repository < ApplicationRecord
       committer = host.committers.create(login: login, emails: [email])
     end
     committer.login
-  rescue
+  rescue => e
+    puts e
     nil
   end
 
   def fetch_all_logins
     return nil if host.name != 'GitHub'
+    return if status == 'not_found'
+    return if committers.nil?
+
     committers.each do |committer|
       next if committer['login'].present?
       committer['login'] = fetch_login(committer['email'])
     end
-    past_year_committers.each do |committer|
-      next if committer['login'].present?
-      committer['login'] = fetch_login(committer['email'])
+
+    if past_year_committers
+      past_year_committers.each do |committer|
+        next if committer['login'].present?
+        committer['login'] = fetch_login(committer['email'])
+      end
     end
+
     update(committers: committers, past_year_committers: past_year_committers)
   end
 
