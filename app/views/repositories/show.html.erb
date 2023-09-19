@@ -50,8 +50,13 @@
             <tbody>
               <% @repository.committers.each do |committer| %>
                 <tr>
-                  <td><%= link_to_unless committer['login'].blank?, committer['name'], @repository.committer_url(committer['login']) %></td>
-                  <td><%= obfusticate_email(committer['email']) %></td>
+                  <td>
+                    <%= link_to_unless committer['login'].blank?, committer['name'], @repository.committer_url(committer['login']) %>
+                    <% if bot?(committer) %>
+                      <span title='bot'>🤖</span>
+                    <% end %>
+                  </td>
+                  <td><%= (committer['email']) %></td>
                   <td><%= committer['count'] %></td>
                 </tr>
               <% end %>
@@ -78,8 +83,13 @@
               <tbody>
                 <% @repository.past_year_committers.each do |committer| %>
                   <tr>
-                    <td><%= link_to_unless committer['login'].blank?, committer['name'], @repository.committer_url(committer['login']) %></td>
-                    <td><%= obfusticate_email(committer['email']) %></td>
+                    <td>
+                      <%= link_to_unless committer['login'].blank?, committer['name'], @repository.committer_url(committer['login']) %>
+                      <% if bot?(committer) %>
+                        <span title='bot'>🤖</span>
+                      <% end %>
+                    </td>
+                    <td><%= (committer['email']) %></td>
                     <td><%= committer['count'] %></td>
                   </tr>
                 <% end %>
@@ -103,9 +113,6 @@
           <% end %>
         </div>
       </div>
-
-
-    
       
     <% end %>
   <% else %>

@@ -19,4 +19,9 @@ module ApplicationHelper
       end
     end.join('@')
   end
+
+  def bot?(committer)
+    return false unless committer
+    committer['name'].ends_with?('[bot]')
+  end
 end
