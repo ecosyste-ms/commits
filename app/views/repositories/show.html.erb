@@ -56,7 +56,7 @@
                       <span title='bot'>🤖</span>
                     <% end %>
                   </td>
-                  <td><%= (committer['email']) %></td>
+                  <td><%= obfusticate_email(committer['email']) %></td>
                   <td><%= committer['count'] %></td>
                 </tr>
               <% end %>
@@ -89,7 +89,7 @@
                         <span title='bot'>🤖</span>
                       <% end %>
                     </td>
-                    <td><%= (committer['email']) %></td>
+                    <td><%= obfusticate_email(committer['email']) %></td>
                     <td><%= committer['count'] %></td>
                   </tr>
                 <% end %>
