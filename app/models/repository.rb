@@ -122,7 +122,6 @@ class Repository < ApplicationRecord
           past_year_mean_commits = 0
         end
 
-
         updates = {
           committers: committers,
           last_synced_commit: last_commit,
@@ -176,7 +175,6 @@ class Repository < ApplicationRecord
     end
 
     updated_committers = (committers.select{|h| h['login'].blank? } + updated_committers_with_login).sort_by{|h| h['count']}.reverse
-
 
     updates = {
       committers: updated_committers,
