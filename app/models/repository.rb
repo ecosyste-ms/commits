@@ -111,8 +111,10 @@ class Repository < ApplicationRecord
         past_year_committers = parse_commit_counts(past_year_output)
 
         total_commits = committers.sum{|h| h[:count]}
+        total_bot_commits = committers.select{|h| h[:name].ends_with?('[bot]')}.sum{|h| h[:count]}
 
         past_year_total_commits = past_year_committers.sum{|h| h[:count]}
+        past_year_total_bot_commits = past_year_committers.select{|h| h[:name].ends_with?('[bot]')}.sum{|h| h[:count]}
 
         if past_year_committers.first
           past_year_dds = 1 - (past_year_committers.first[:count].to_f / past_year_total_commits)
@@ -127,11 +129,15 @@ class Repository < ApplicationRecord
           last_synced_commit: last_commit,
           total_commits: total_commits,
           total_committers: committers.length,
+          total_bot_commits: total_bot_commits,
+          total_bot_committers: committers.select{|h| h[:name].ends_with?('[bot]')}.length,
           mean_commits: (total_commits.to_f / committers.length),
           dds: 1 - (committers.first[:count].to_f / total_commits),
           past_year_committers: past_year_committers,
           past_year_total_commits: past_year_total_commits,
           past_year_total_committers: past_year_committers.length,
+          past_year_total_bot_commits: past_year_total_bot_commits,
+          past_year_total_bot_committers: past_year_committers.select{|h| h[:name].ends_with?('[bot]')}.length,
           past_year_mean_commits: past_year_mean_commits,
           past_year_dds: past_year_dds,
           last_synced_at: Time.now
@@ -179,6 +185,8 @@ class Repository < ApplicationRecord
     updates = {
       committers: updated_committers,
       total_committers: updated_committers.length,
+      total_bot_committers: updated_committers.select{|h| h['name'].ends_with?('[bot]')}.length,
+      total_bot_commits: updated_committers.select{|h| h['name'].ends_with?('[bot]')}.sum{|h| h['count']},
       mean_commits: (total_commits.to_f / updated_committers.length),
       dds: 1 - (updated_committers.first['count'].to_f / total_commits),
     }
@@ -192,6 +200,8 @@ class Repository < ApplicationRecord
 
       updates[:past_year_committers] = updated_past_year_committers
       updates[:past_year_total_committers] = updated_past_year_committers.length
+      updates[:past_year_total_bot_committers] = updated_past_year_committers.select{|h| h['name'].ends_with?('[bot]')}.length
+      updates[:past_year_total_bot_commits] = updated_past_year_committers.select{|h| h['name'].ends_with?('[bot]')}.sum{|h| h['count']}
       updates[:past_year_mean_commits] = (past_year_total_commits.to_f / updated_past_year_committers.length)
       updates[:past_year_dds] = 1 - (updated_past_year_committers.first['count'].to_f / past_year_total_commits)
     end

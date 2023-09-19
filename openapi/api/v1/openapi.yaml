@@ -205,6 +205,10 @@ components:
           type: integer
         total_committers:
           type: integer
+        total_bot_commits:
+          type: integer
+        total_bot_committers:
+          type: integer
         mean_commits:
           type: number
         dds:
@@ -216,6 +220,10 @@ components:
         past_year_total_commits:
           type: integer
         past_year_total_committers:
+          type: integer
+        past_year_total_bot_commits:
+          type: integer
+        past_year_total_bot_committers:
           type: integer
         past_year_mean_commits:
           type: number
