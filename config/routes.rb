@@ -18,7 +18,11 @@ Rails.application.routes.draw do
       get 'repositories/lookup', to: 'repositories#lookup', as: :repositories_lookup
       resources :jobs
       resources :hosts, constraints: { id: /.*/ }, only: [:index, :show] do
-        resources :repositories, constraints: { id: /.*/ }, only: [:index, :show]
+        resources :repositories, constraints: { id: /.*/ }, only: [:index, :show] do
+          member do
+            get 'ping', to: 'repositories#ping'
+          end
+        end
       end
     end
   end
