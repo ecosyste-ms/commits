@@ -1,6 +1,8 @@
 class Repository < ApplicationRecord
   belongs_to :host
 
+  has_many :commits
+
   validates :full_name, presence: true
 
   scope :active, -> { where(status: nil) }
@@ -333,6 +335,43 @@ class Repository < ApplicationRecord
         remove_token(token)
       end
     end
+  end
+
+  def fetch_commits
+    # load commits via rugged
+    commits = []
+    Dir.mktmpdir do |dir|
+      Rugged::Repository.clone_at(git_clone_url, dir)
+      repo = Rugged::Repository.new(dir)
+      walker = Rugged::Walker.new(repo)
+      walker.hide(repo.lookup(last_synced_commit)) if last_synced_commit
+      walker.sorting(Rugged::SORT_DATE)
+      walker.push(repo.head.target)
+      walker.each do |commit|
+        commits << {
+          repository_id: id,
+          sha: commit.oid,
+          message: commit.message.strip,
+          timestamp: commit.time.iso8601,
+          merge: commit.parents.length > 1,
+          author: "#{commit.author[:name]} <#{commit.author[:email]}>",
+          committer: "#{commit.committer[:name]} <#{commit.committer[:email]}>",
+          stats: commit.diff.stat
+        }
+      end
+      walker.reset
+      repo.close
+    end
+    commits
+  end
+
+  def sync_commits
+    commit_hashes = fetch_commits
+    return if commit_hashes.empty?
+    Commit.upsert_all(commit_hashes) 
+    update(last_synced_commit: commit_hashes.first[:sha], last_synced_at: Time.now)
+  rescue => e
+    puts "Error syncing commits for #{full_name}: #{e}"
   end
 
   private

@@ -10,10 +10,24 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.0].define(version: 2023_09_19_145309) do
+ActiveRecord::Schema[7.1].define(version: 2024_01_29_170313) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
+
+  create_table "commits", force: :cascade do |t|
+    t.integer "repository_id"
+    t.string "sha"
+    t.string "message"
+    t.datetime "timestamp"
+    t.boolean "merge"
+    t.string "author"
+    t.string "committer"
+    t.integer "stats", default: [], array: true
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["repository_id", "sha"], name: "index_commits_on_repository_id_and_sha"
+  end
 
   create_table "committers", force: :cascade do |t|
     t.integer "host_id"
