@@ -22,6 +22,7 @@ Rails.application.routes.draw do
           member do
             get 'ping', to: 'repositories#ping'
           end
+          resources :commits, only: [:index]
         end
       end
     end

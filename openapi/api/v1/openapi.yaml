@@ -172,6 +172,70 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Repository'
+  /hosts/{hostName}/repositories/{repoName}/commits:
+    get:
+      summary: get a list of commits from a repository
+      operationId: getRepositoryCommits
+      parameters:
+        - in: path
+          name: hostName
+          schema:
+            type: string
+          required: true
+          description: name of host
+        - in: path
+          name: repoName
+          schema:
+            type: string
+          required: true
+          description: name of repository
+        - name: page
+          in: query
+          description: pagination page number 
+          required: false
+          schema:
+            type: integer
+        - name: per_page
+          in: query
+          description: Number of records to return 
+          required: false
+          schema:
+            type: integer
+        - name: since
+          in: query
+          description: filter by commits since given time
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: until
+          in: query
+          description: filter by commits until given time
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: sort
+          in: query
+          description: field to order results by
+          required: false
+          schema:
+            type: string
+        - name: order
+          in: query
+          description: direction to order results by
+          required: false
+          schema:
+            type: string
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Commit'
 components:
   schemas:
     Host:
@@ -240,3 +304,21 @@ components:
         created_at:
           type: string
           format: date-time
+        commits_url:
+          type: string
+    Commit:
+      type: object
+      properties:
+        sha:
+          type: string
+        message:
+          type: string
+        author:
+          type: string
+        committer:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        merge:
+          type: boolean

@@ -1,0 +1,1 @@
+json.extract! commit, :sha, :message, :author, :committer, :timestamp, :merge
