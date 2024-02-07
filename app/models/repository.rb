@@ -110,7 +110,7 @@ class Repository < ApplicationRecord
           counts = count_commits_internal(dir)
           commit_hashes = fetch_commits_internal(repo)
           Commit.upsert_all(commit_hashes) unless commit_hashes.empty?
-          update(updates)
+          update(counts)
         end
       rescue => e
         # TODO record error in clone (likely missing repo but also maybe host downtime)
@@ -357,10 +357,14 @@ class Repository < ApplicationRecord
     commits
   end
 
+  def commits_count
+    commits.count
+  end
+
   def fetch_commits_internal(repo)
     commits = []
     walker = Rugged::Walker.new(repo)
-    walker.hide(repo.lookup(last_synced_commit)) if last_synced_commit
+    walker.hide(repo.lookup(last_synced_commit)) if last_synced_commit && commits_count > 0
     walker.sorting(Rugged::SORT_DATE)
     walker.push(repo.head.target)
     walker.each do |commit|
