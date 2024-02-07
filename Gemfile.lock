@@ -157,7 +157,7 @@ GEM
     marcel (1.0.2)
     mini_mime (1.1.5)
     mini_portile2 (2.8.5)
-    minitest (5.22.0)
+    minitest (5.22.1)
     mocha (2.1.0)
       ruby2_keywords (>= 0.0.5)
     msgpack (1.7.2)
@@ -267,6 +267,7 @@ GEM
       actionpack (>= 3.1, < 7.2)
       railties (>= 3.1, < 7.2)
     ruby2_keywords (0.0.5)
+    rugged (1.7.2)
     sassc (2.4.0)
       ffi (~> 1.9)
     sassc-rails (2.1.2)
@@ -364,6 +365,7 @@ DEPENDENCIES
   redis
   rswag-api
   rswag-ui
+  rugged
   sassc-rails
   shoulda-context
   shoulda-matchers
