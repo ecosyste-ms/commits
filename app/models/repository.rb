@@ -90,6 +90,10 @@ class Repository < ApplicationRecord
     `git ls-remote #{git_clone_url} #{default_branch}`.split("\t").first
   end
 
+  def clone_repository(dir)
+    Rugged::Repository.clone_at(git_clone_url, dir)
+  end
+
   # TODO support hg and svn repos
 
   def count_commits
@@ -101,56 +105,63 @@ class Repository < ApplicationRecord
       update(last_synced_at: Time.now)
     else
       begin
-      Dir.mktmpdir do |dir|
-        Rugged::Repository.clone_at(git_clone_url, dir)
-        last_commit = `git -C #{dir} rev-parse HEAD`.strip
-        output = `git -C #{dir} shortlog -s -n -e --no-merges HEAD`      
-
-        past_year_output = `git -C #{dir} shortlog -s -n -e --no-merges --since="1 year ago" HEAD`
-
-        committers = parse_commit_counts(output)
-
-        past_year_committers = parse_commit_counts(past_year_output)
-
-        total_commits = committers.sum{|h| h[:count]}
-        total_bot_commits = committers.select{|h| h[:name].ends_with?('[bot]')}.sum{|h| h[:count]}
-
-        past_year_total_commits = past_year_committers.sum{|h| h[:count]}
-        past_year_total_bot_commits = past_year_committers.select{|h| h[:name].ends_with?('[bot]')}.sum{|h| h[:count]}
-
-        if past_year_committers.first
-          past_year_dds = 1 - (past_year_committers.first[:count].to_f / past_year_total_commits)
-          past_year_mean_commits = (past_year_total_commits.to_f / past_year_committers.length)
-        else
-          past_year_dds = 0
-          past_year_mean_commits = 0
+        Dir.mktmpdir do |dir|
+          repo = clone_repository(dir)
+          counts = count_commits_internal(dir)
+          commit_hashes = fetch_commits_internal(repo)
+          Commit.upsert_all(commit_hashes) unless commit_hashes.empty?
+          update(updates)
         end
-
-        updates = {
-          committers: committers,
-          last_synced_commit: last_commit,
-          total_commits: total_commits,
-          total_committers: committers.length,
-          total_bot_commits: total_bot_commits,
-          total_bot_committers: committers.select{|h| h[:name].ends_with?('[bot]')}.length,
-          mean_commits: (total_commits.to_f / committers.length),
-          dds: 1 - (committers.first[:count].to_f / total_commits),
-          past_year_committers: past_year_committers,
-          past_year_total_commits: past_year_total_commits,
-          past_year_total_committers: past_year_committers.length,
-          past_year_total_bot_commits: past_year_total_bot_commits,
-          past_year_total_bot_committers: past_year_committers.select{|h| h[:name].ends_with?('[bot]')}.length,
-          past_year_mean_commits: past_year_mean_commits,
-          past_year_dds: past_year_dds,
-          last_synced_at: Time.now
-        }
-        update(updates)
-      end
-      rescue
+      rescue => e
         # TODO record error in clone (likely missing repo but also maybe host downtime)
+        puts "Error counting commits for #{full_name}: #{e}"
       end
     end
     
+  end
+
+  def count_commits_internal(dir)
+    last_commit = `git -C #{dir} rev-parse HEAD`.strip
+    output = `git -C #{dir} shortlog -s -n -e --no-merges HEAD`      
+
+    past_year_output = `git -C #{dir} shortlog -s -n -e --no-merges --since="1 year ago" HEAD`
+
+    committers = parse_commit_counts(output)
+
+    past_year_committers = parse_commit_counts(past_year_output)
+
+    total_commits = committers.sum{|h| h[:count]}
+    total_bot_commits = committers.select{|h| h[:name].ends_with?('[bot]')}.sum{|h| h[:count]}
+
+    past_year_total_commits = past_year_committers.sum{|h| h[:count]}
+    past_year_total_bot_commits = past_year_committers.select{|h| h[:name].ends_with?('[bot]')}.sum{|h| h[:count]}
+
+    if past_year_committers.first
+      past_year_dds = 1 - (past_year_committers.first[:count].to_f / past_year_total_commits)
+      past_year_mean_commits = (past_year_total_commits.to_f / past_year_committers.length)
+    else
+      past_year_dds = 0
+      past_year_mean_commits = 0
+    end
+
+    updates = {
+      committers: committers,
+      last_synced_commit: last_commit,
+      total_commits: total_commits,
+      total_committers: committers.length,
+      total_bot_commits: total_bot_commits,
+      total_bot_committers: committers.select{|h| h[:name].ends_with?('[bot]')}.length,
+      mean_commits: (total_commits.to_f / committers.length),
+      dds: 1 - (committers.first[:count].to_f / total_commits),
+      past_year_committers: past_year_committers,
+      past_year_total_commits: past_year_total_commits,
+      past_year_total_committers: past_year_committers.length,
+      past_year_total_bot_commits: past_year_total_bot_commits,
+      past_year_total_bot_committers: past_year_committers.select{|h| h[:name].ends_with?('[bot]')}.length,
+      past_year_mean_commits: past_year_mean_commits,
+      past_year_dds: past_year_dds,
+      last_synced_at: Time.now
+    }
   end
 
   def parse_commit_counts(output)
@@ -338,30 +349,34 @@ class Repository < ApplicationRecord
   end
 
   def fetch_commits
-    # load commits via rugged
     commits = []
     Dir.mktmpdir do |dir|
-      Rugged::Repository.clone_at(git_clone_url, dir)
-      repo = Rugged::Repository.new(dir)
-      walker = Rugged::Walker.new(repo)
-      walker.hide(repo.lookup(last_synced_commit)) if last_synced_commit
-      walker.sorting(Rugged::SORT_DATE)
-      walker.push(repo.head.target)
-      walker.each do |commit|
-        commits << {
-          repository_id: id,
-          sha: commit.oid,
-          message: commit.message.strip,
-          timestamp: commit.time.iso8601,
-          merge: commit.parents.length > 1,
-          author: "#{commit.author[:name]} <#{commit.author[:email]}>",
-          committer: "#{commit.committer[:name]} <#{commit.committer[:email]}>",
-          stats: commit.diff.stat
-        }
-      end
-      walker.reset
-      repo.close
+      repo = clone_repository(dir)
+      commits = fetch_commits_internal(repo)
     end
+    commits
+  end
+
+  def fetch_commits_internal(repo)
+    commits = []
+    walker = Rugged::Walker.new(repo)
+    walker.hide(repo.lookup(last_synced_commit)) if last_synced_commit
+    walker.sorting(Rugged::SORT_DATE)
+    walker.push(repo.head.target)
+    walker.each do |commit|
+      commits << {
+        repository_id: id,
+        sha: commit.oid,
+        message: commit.message.strip,
+        timestamp: commit.time.iso8601,
+        merge: commit.parents.length > 1,
+        author: "#{commit.author[:name]} <#{commit.author[:email]}>",
+        committer: "#{commit.committer[:name]} <#{commit.committer[:email]}>",
+        stats: commit.diff.stat
+      }
+    end
+    walker.reset
+    repo.close
     commits
   end
 
@@ -369,7 +384,6 @@ class Repository < ApplicationRecord
     commit_hashes = fetch_commits
     return if commit_hashes.empty?
     Commit.upsert_all(commit_hashes) 
-    update(last_synced_commit: commit_hashes.first[:sha], last_synced_at: Time.now)
   rescue => e
     puts "Error syncing commits for #{full_name}: #{e}"
   end
