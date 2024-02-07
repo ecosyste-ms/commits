@@ -102,7 +102,7 @@ class Repository < ApplicationRecord
     else
       begin
       Dir.mktmpdir do |dir|
-        `GIT_TERMINAL_PROMPT=0 git clone -b #{default_branch} --single-branch #{git_clone_url} #{dir}`
+        Rugged::Repository.clone_at(git_clone_url, dir)
         last_commit = `git -C #{dir} rev-parse HEAD`.strip
         output = `git -C #{dir} shortlog -s -n -e --no-merges HEAD`      
 
