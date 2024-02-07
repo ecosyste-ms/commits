@@ -15,6 +15,7 @@ RUN apk add --update \
     tzdata \
     curl-dev \
     libc6-compat \
+    cmake \
  && rm -rf /var/cache/apk/* 
 
 # Will invalidate cache as soon as the Gemfile changes
