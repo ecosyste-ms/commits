@@ -101,7 +101,7 @@ class Repository < ApplicationRecord
     return if status == 'not_found'
     last_commit = fetch_head_sha
 
-    if !past_year_committers.nil? && last_synced_commit == last_commit
+    if !past_year_committers.nil? && last_synced_commit == last_commit && commits_count > 0
       update(last_synced_at: Time.now)
     else
       begin
