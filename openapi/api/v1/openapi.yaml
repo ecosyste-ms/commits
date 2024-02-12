@@ -322,3 +322,15 @@ components:
           format: date-time
         merge:
           type: boolean
+        html_url:
+          type: string
+        stats:
+          type: object
+          properties:
+            files_changed:
+              type: integer
+            additions:
+              type: integer
+            deletions:
+              type: integer
+            
