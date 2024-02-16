@@ -33,7 +33,7 @@ gem 'sidekiq-status'
 gem 'addressable'
 gem 'appsignal'
 gem "groupdate"
-gem 'google-protobuf', '3.25.2'
+gem 'google-protobuf', '3.25.3'
 gem 'octokit'
 gem 'redis'
 gem 'rugged'
