@@ -108,8 +108,8 @@ class Repository < ApplicationRecord
         Dir.mktmpdir do |dir|
           repo = clone_repository(dir)
           counts = count_commits_internal(dir)
-          commit_hashes = fetch_commits_internal(repo)
-          Commit.upsert_all(commit_hashes) unless commit_hashes.empty?
+          # commit_hashes = fetch_commits_internal(repo)
+          # Commit.upsert_all(commit_hashes) unless commit_hashes.empty?
           update(counts)
         end
       rescue => e
