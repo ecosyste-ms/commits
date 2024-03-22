@@ -18,5 +18,6 @@ class Api::V1::CommitsController < Api::V1::ApplicationController
     end
 
     @pagy, @commits = pagy_countless(@repository.commits.order('timestamp DESC'))
+    fresh_when @commits, public: true
   end
 end
