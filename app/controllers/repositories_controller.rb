@@ -6,6 +6,7 @@ class RepositoriesController < ApplicationController
     raise ActiveRecord::RecordNotFound unless @host
     path = parsed_url.path.delete_prefix('/').chomp('/')
     @repository = @host.repositories.find_by('lower(full_name) = ?', path.downcase)
+    fresh_when @repository, public: true
     if @repository
       @repository.sync_async(request.remote_ip) unless @repository.last_synced_at.present? && @repository.last_synced_at > 1.day.ago
       redirect_to host_repository_path(@host, @repository)
@@ -22,6 +23,7 @@ class RepositoriesController < ApplicationController
   def show
     @host = Host.find_by_name!(params[:host_id])
     @repository = @host.repositories.find_by('lower(full_name) = ?', params[:id].downcase)
+    fresh_when @repository, public: true
     if @repository.nil?
       @job = @host.sync_repository_async(params[:id], request.remote_ip)
       @repository = @host.repositories.find_by('lower(full_name) = ?', params[:id].downcase)
