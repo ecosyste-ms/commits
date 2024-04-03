@@ -3,6 +3,7 @@ class OwnersController < ApplicationController
     @host = Host.find_by_name!(params[:host_id])
     scope = @host.repositories.visible.group(:owner).count.sort_by { |k, v| [-v, k] }
     @pagy, @owners = pagy_array(scope)
+    fresh_when(@owners)
   end
 
   def show
@@ -18,6 +19,7 @@ class OwnersController < ApplicationController
     end
 
     @pagy, @repositories = pagy_countless(scope)
+    fresh_when(@repositories)
     raise ActiveRecord::RecordNotFound if @repositories.empty?
   end
 end
