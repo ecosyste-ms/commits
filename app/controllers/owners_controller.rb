@@ -1,6 +1,8 @@
 class OwnersController < ApplicationController
   def index
-    # TODO
+    @host = Host.find_by_name!(params[:host_id])
+    scope = @host.repositories.visible.group(:owner).count.sort_by { |k, v| [-v, k] }
+    @pagy, @owners = pagy_array(scope)
   end
 
   def show
