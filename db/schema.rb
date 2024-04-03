@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2024_01_29_170313) do
+ActiveRecord::Schema[7.1].define(version: 2024_04_03_140527) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -95,6 +95,7 @@ ActiveRecord::Schema[7.1].define(version: 2024_01_29_170313) do
     t.integer "total_bot_committers"
     t.integer "past_year_total_bot_commits"
     t.integer "past_year_total_bot_committers"
+    t.string "owner"
     t.index "host_id, lower((full_name)::text)", name: "index_repositories_on_host_id_lower_full_name", unique: true
   end
 

@@ -11,6 +11,8 @@ class Repository < ApplicationRecord
   scope :updated_after, ->(date) { where('updated_at > ?', date) }
   scope :owner, ->(owner) { where('full_name LIKE ?', "#{owner}/%") }
 
+  before_save :set_owner
+
   def self.sync_least_recently_synced
     Repository.active.order('last_synced_at ASC').limit(500).each(&:sync_async)
   end
@@ -36,8 +38,12 @@ class Repository < ApplicationRecord
     full_name.split('/')[1..-1].join('/')
   end
 
+  def set_owner
+    self.owner = full_name.split('/').first
+  end
+
   def owner
-    full_name.split('/').first
+    read_attribute(:owner) || full_name.split('/').first
   end
 
   def sync_async(remote_ip = '0.0.0.0')
