@@ -9,9 +9,10 @@ class Repository < ApplicationRecord
   scope :visible, -> { active.where.not(last_synced_at: nil).where.not(total_commits: nil) }
   scope :created_after, ->(date) { where('created_at > ?', date) }
   scope :updated_after, ->(date) { where('updated_at > ?', date) }
+  scope :owner, ->(owner) { where('full_name LIKE ?', "#{owner}/%") }
 
   def self.sync_least_recently_synced
-    Repository.active.order('last_synced_at ASC').limit(1000).each(&:sync_async)
+    Repository.active.order('last_synced_at ASC').limit(500).each(&:sync_async)
   end
 
   def to_s
