@@ -3,7 +3,7 @@ class OwnersController < ApplicationController
     @host = Host.find_by_name!(params[:host_id])
     scope = @host.repositories.visible.group(:owner).count.sort_by { |k, v| [-v, k] }
     @pagy, @owners = pagy_array(scope)
-    fresh_when(@owners)
+    expires_in 1.day, public: true
   end
 
   def show
