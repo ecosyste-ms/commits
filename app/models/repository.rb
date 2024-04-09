@@ -14,7 +14,7 @@ class Repository < ApplicationRecord
   before_save :set_owner
 
   def self.sync_least_recently_synced
-    Repository.active.order('last_synced_at ASC').limit(500).each(&:sync_async)
+    Repository.active.order('last_synced_at ASC').limit(100).each(&:sync_async)
   end
 
   def to_s
