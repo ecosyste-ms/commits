@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2024_04_03_140527) do
+ActiveRecord::Schema[7.1].define(version: 2024_04_14_222838) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pgcrypto"
   enable_extension "plpgsql"
@@ -59,6 +59,7 @@ ActiveRecord::Schema[7.1].define(version: 2024_04_03_140527) do
     t.bigint "commits_count"
     t.bigint "contributors_count"
     t.string "icon_url"
+    t.bigint "owners_count", default: 0
   end
 
   create_table "jobs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
