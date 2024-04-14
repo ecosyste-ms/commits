@@ -254,6 +254,12 @@ components:
           format: date-time
         commits_count:
           type: integer
+        contributors_count:
+          type: integer
+        owners_count:
+          type: integer
+        icon_url:
+          type: string
     Repository:
       type: object
       properties:
