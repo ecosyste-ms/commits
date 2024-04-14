@@ -22,7 +22,9 @@
     <li class="nav-item">
       <a class="nav-link active" href="<%= host_committers_path(@host) %>">
         Committers
-        <%= number_with_delimiter @host.contributors_count %>
+        <span class="badge bg-secondary rounded-pill">
+          <%= number_with_delimiter @host.contributors_count %>
+        </span>
       </a>
     </li>
     <%= render 'sort' %>

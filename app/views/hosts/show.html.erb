@@ -22,6 +22,9 @@
     <li class="nav-item">
       <a class="nav-link" href="<%= host_committers_path(@host) %>" aria-current="page">
         Committers
+        <span class="badge bg-secondary rounded-pill">
+          <%= number_with_delimiter @host.contributors_count %>
+        </span>
       </a>
     </li>
     <%= render 'sort' %>
