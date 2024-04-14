@@ -10,10 +10,11 @@
     <% end %>
   </h1>
 
+  <% if @committer.commits_count > 0 %>
   <p>
     Total Commits: <%= number_with_delimiter @committer.commits_count %><br/>
-    Repositories: <%= number_with_delimiter @pagy.count %>
   </p>
+  <% end %>
 
   <%= render @repositories %>
   <%== pagy_bootstrap_nav(@pagy) if @pagy.pages > 1 %>  

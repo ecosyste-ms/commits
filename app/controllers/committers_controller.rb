@@ -10,7 +10,7 @@ class CommittersController < ApplicationController
       scope = scope.order(Arel.sql(sort).desc.nulls_last)
     end
 
-    @pagy, @committers = pagy(scope)
+    @pagy, @committers = pagy_countless(scope)
   end
 
   def show
@@ -23,6 +23,6 @@ class CommittersController < ApplicationController
       end
     end
     raise ActiveRecord::RecordNotFound unless @committer
-    @pagy, @repositories = pagy(@committer.repositories)
+    @pagy, @repositories = pagy_countless(@committer.repositories)
   end
 end
