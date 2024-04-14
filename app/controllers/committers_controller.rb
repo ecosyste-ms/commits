@@ -2,6 +2,14 @@ class CommittersController < ApplicationController
   def index
     @host = Host.find_by_name!(params[:host_id])
     scope = @host.committers
+
+    sort = params[:sort].presence || 'updated_at'
+    if params[:order] == 'asc'
+      scope = scope.order(Arel.sql(sort).asc.nulls_last)
+    else
+      scope = scope.order(Arel.sql(sort).desc.nulls_last)
+    end
+
     @pagy, @committers = pagy(scope)
   end
 
