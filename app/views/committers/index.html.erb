@@ -7,7 +7,7 @@
 
   <ul class="nav nav-tabs my-3">
     <li class="nav-item">
-      <a class="nav-link active" aria-current="page">
+      <a class="nav-link" aria-current="page">
         Repositories
         <span class="badge bg-secondary rounded-pill">
           <%= number_with_delimiter @host.repositories_count %>
@@ -20,13 +20,14 @@
       </a>
     </li>
     <li class="nav-item">
-      <a class="nav-link" href="<%= host_committers_path(@host) %>" aria-current="page">
+      <a class="nav-link active" href="<%= host_committers_path(@host) %>">
         Committers
+        <%= number_with_delimiter @host.contributors_count %>
       </a>
     </li>
     <%= render 'sort' %>
   </ul>
 
-  <%= render @repositories %>
+  <%= render @committers %>
   <%== pagy_bootstrap_nav(@pagy) if @pagy.pages > 1 %>  
 </div>

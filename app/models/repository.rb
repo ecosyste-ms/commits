@@ -11,6 +11,27 @@ class Repository < ApplicationRecord
   scope :updated_after, ->(date) { where('updated_at > ?', date) }
   scope :owner, ->(owner) { where('full_name LIKE ?', "#{owner}/%") }
 
+  scope :committer, ->(login) { 
+    where("EXISTS (
+      SELECT 1 FROM json_array_elements(committers::json) AS j
+      WHERE j->>'login' = ?
+    )", login)
+  }
+
+  scope :committer_email, ->(email) { 
+    where("EXISTS (
+      SELECT 1 FROM json_array_elements(committers::json) AS j
+      WHERE j->>'email' = ?
+    )", email)
+  }
+
+  scope :committer_login_or_email, ->(login,email) {
+    where("EXISTS (
+      SELECT 1 FROM json_array_elements(committers::json) AS j
+      WHERE j->>'login' = ? OR j->>'email' = ?
+    )", login, email)
+  }
+
   before_save :set_owner
 
   def self.sync_least_recently_synced
@@ -318,7 +339,6 @@ class Repository < ApplicationRecord
 
     group_commits_by_login
   end
-
 
   def committer_url(login)
     "#{host.url}/#{login}"

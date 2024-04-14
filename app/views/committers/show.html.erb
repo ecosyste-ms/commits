@@ -1,0 +1,20 @@
+<% @meta_title = "#{@committer} | #{@host}" %>
+
+<div class="container-sm">
+  <h1>
+    <%= link_to @host, host_path(@host) %> /
+    <% if @committer.login.present? %>
+      <%= link_to @committer, @committer.html_url, target: :_blank %>
+    <% else %>
+      <%= @committer %>
+    <% end %>
+  </h1>
+
+  <p>
+    Total Commits: <%= number_with_delimiter @committer.commits_count %><br/>
+    Repositories: <%= number_with_delimiter @pagy.count %>
+  </p>
+
+  <%= render @repositories %>
+  <%== pagy_bootstrap_nav(@pagy) if @pagy.pages > 1 %>  
+</div>

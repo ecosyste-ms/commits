@@ -1,0 +1,29 @@
+<div class="card mb-3 committer d-flex" id="committer_<%= committer.id %>">
+  <div class="card-body pb-1">
+    <div class="d-flex">
+      
+      <div class="flex-grow-1 ms-3 text-break">
+        <h5 class='card-title'>
+          <% if @host.nil? %>
+            <%= link_to committer.host.name, host_path(committer.host.name) %> / <% end %>
+            <%= link_to committer, host_committer_path(committer.host, committer) %>
+        </h5>
+      
+        <%# todo description %>
+        <p class="card-subtitle mb-2 text-muted"><i><small>
+          <% if committer.commits_count %>
+              Total Commits: <%= number_with_delimiter committer.commits_count %><br>
+          <% end %>
+          <% if committer.updated_at %>
+              Last synced: <%= distance_of_time_in_words_to_now committer.updated_at %> ago
+          <% end %>
+          
+        </small></i></p>
+      </div>
+      <div class="flex-shrink-0">
+        <%# todo avatar url %>
+        <img src="" class="rounded" height='40' width='40' onerror="this.style.display='none'">
+      </div>  
+    </div>
+  </div>
+</div>
