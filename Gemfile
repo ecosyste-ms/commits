@@ -37,6 +37,7 @@ gem 'google-protobuf', '4.27.0'
 gem 'octokit'
 gem 'redis'
 gem 'rugged'
+gem 'postgresql_cursor'
 
 group :development, :test do
   gem "debug", platforms: %i[ mri mingw x64_mingw ]
