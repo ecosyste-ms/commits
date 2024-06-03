@@ -10,6 +10,7 @@ class Job < ApplicationRecord
 
   def self.clean_up
     Job.status(["complete",'error']).where('created_at < ?', 1.day.ago).delete_all
+    Job.where('created_at < ?', 1.week.ago).delete_all
   end
 
   def check_status
