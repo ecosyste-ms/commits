@@ -15,6 +15,7 @@ gem "counter_culture"
 gem "faraday"
 gem "faraday-retry"
 gem "faraday-follow_redirects"
+gem 'faraday-multipart'
 gem "pagy"
 gem "pghero"
 gem "pg_query"
