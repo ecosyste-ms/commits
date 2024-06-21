@@ -39,6 +39,7 @@ gem 'octokit'
 gem 'redis'
 gem 'rugged'
 gem 'postgresql_cursor'
+gem "net-pop", github: "ruby/net-pop"
 
 group :development, :test do
   gem "debug", platforms: %i[ mri mingw x64_mingw ]
