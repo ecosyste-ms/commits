@@ -137,7 +137,7 @@ GEM
     ffi (1.17.0)
     ffi (1.17.0-aarch64-linux-musl)
     ffi (1.17.0-arm64-darwin)
-    ffi (1.17.0-x86_64-darwin)
+    ffi (1.17.0-x86_64-linux-gnu)
     globalid (1.2.1)
       activesupport (>= 6.1)
     google-protobuf (4.27.1)
@@ -149,7 +149,7 @@ GEM
     google-protobuf (4.27.1-arm64-darwin)
       bigdecimal
       rake (>= 13)
-    google-protobuf (4.27.1-x86_64-darwin)
+    google-protobuf (4.27.1-x86_64-linux)
       bigdecimal
       rake (>= 13)
     groupdate (6.4.0)
@@ -202,7 +202,7 @@ GEM
       racc (~> 1.4)
     nokogiri (1.16.6-arm64-darwin)
       racc (~> 1.4)
-    nokogiri (1.16.6-x86_64-darwin)
+    nokogiri (1.16.6-x86_64-linux)
       racc (~> 1.4)
     numerizer (0.1.1)
     octokit (9.1.0)
@@ -279,7 +279,7 @@ GEM
       connection_pool
     reline (0.5.9)
       io-console (~> 0.5)
-    rexml (3.3.0)
+    rexml (3.3.1)
       strscan
     rswag-api (2.13.0)
       activesupport (>= 3.1, < 7.2)
@@ -354,7 +354,7 @@ PLATFORMS
   arm64-darwin-21
   arm64-darwin-23
   ruby
-  x86_64-darwin-20
+  x86_64-linux
 
 DEPENDENCIES
   addressable
