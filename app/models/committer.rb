@@ -2,6 +2,8 @@ class Committer < ApplicationRecord
   belongs_to :host
   scope :email, ->(email) { where("emails @> ARRAY[?]::varchar[]", email) }
 
+  has_many :contributions, dependent: :destroy
+
   def to_s
     login || emails.first
   end
@@ -25,5 +27,9 @@ class Committer < ApplicationRecord
 
   def repositories_count
     repositories.count
+  end
+
+  def commits_count
+    contributions.sum(:commit_count)
   end
 end

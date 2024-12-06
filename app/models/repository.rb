@@ -2,6 +2,7 @@ class Repository < ApplicationRecord
   belongs_to :host
 
   has_many :commits
+  has_many :contributions
 
   validates :full_name, presence: true
 
@@ -420,13 +421,31 @@ class Repository < ApplicationRecord
   end
 
   def committer_records
-    committers.map do |committer|
-      if committer['login'].present?
-        c = host.committers.find_by(login: committer['login']) 
+    grouped_committers = committers.map do |committer|
+      next unless committer['login'].present? || committer['email'].present?
+    
+      c = host.committers.find_by(login: committer['login']) if committer['login'].present?
+      c ||= host.committers.email(committer['email']).first
+    
+      next unless c
+    
+      { committer_id: c.id, commit_count: committer['count'] }
+    end.compact
+    
+    grouped_committers = grouped_committers.group_by { |c| c[:committer_id] }.map do |committer_id, records|
+      {
+        committer_id: committer_id,
+        commit_count: records.sum { |r| r[:commit_count].to_i }
+      }
+    end
+  end
+
+  def create_committer_join_records
+    committer_records.each do |record|
+      Contribution.find_or_create_by(repository_id: id, committer_id: record[:committer_id]) do |contribution|
+        contribution.commit_count = record[:commit_count]
       end
-      c = host.committers.email(committer['email']).first if c.nil?
-      c
-    end.uniq.compact
+    end
   end
 
   private

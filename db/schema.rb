@@ -10,10 +10,10 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.1].define(version: 2024_04_14_222838) do
+ActiveRecord::Schema[8.0].define(version: 2024_12_06_154721) do
   # These are extensions that must be enabled in order to support this database
+  enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
-  enable_extension "plpgsql"
 
   create_table "commits", force: :cascade do |t|
     t.integer "repository_id"
@@ -38,6 +38,16 @@ ActiveRecord::Schema[7.1].define(version: 2024_04_14_222838) do
     t.datetime "updated_at", null: false
     t.index ["emails"], name: "index_committers_on_emails", using: :gin
     t.index ["host_id"], name: "index_committers_on_host_id"
+  end
+
+  create_table "contributions", force: :cascade do |t|
+    t.bigint "committer_id", null: false
+    t.bigint "repository_id", null: false
+    t.integer "commit_count"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["committer_id"], name: "index_contributions_on_committer_id"
+    t.index ["repository_id"], name: "index_contributions_on_repository_id"
   end
 
   create_table "exports", force: :cascade do |t|
@@ -100,4 +110,6 @@ ActiveRecord::Schema[7.1].define(version: 2024_04_14_222838) do
     t.index "host_id, lower((full_name)::text)", name: "index_repositories_on_host_id_lower_full_name", unique: true
   end
 
+  add_foreign_key "contributions", "committers"
+  add_foreign_key "contributions", "repositories"
 end
