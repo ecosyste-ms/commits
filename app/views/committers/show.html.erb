@@ -18,10 +18,10 @@
   <% end %>
 
   
-  <% if @repositories %>
-    <%= render @repositories %>
+  <% if @contributions %>
+    <%= render @contributions %>
     <%== pagy_bootstrap_nav(@pagy) if @pagy.pages > 1 %>  
   <% else %>
-    <p>No repositories found</p>
+    <p>No contributions found</p>
   <% end %>
 </div>

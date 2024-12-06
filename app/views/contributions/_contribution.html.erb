@@ -1,0 +1,22 @@
+<div class="card mb-3 contribution d-flex" id="contribution.repository_<%= contribution.repository.id %>">
+  <div class="card-body pb-1">
+    <div class="d-flex">
+      
+      <div class="flex-grow-1 ms-3 text-break">
+        <h5 class='card-title'>
+          <% if @host.nil? %>
+            <%= link_to contribution.repository.host.name, host_path(contribution.repository.host.name) %> / <% end %>
+            <%= link_to contribution.repository, host_repository_path(contribution.repository.host, contribution.repository) %>
+        </h5>
+
+        <p class="card-subtitle mb-2 text-muted"><i><small>
+          Commits: <%= number_with_delimiter contribution.commit_count %><br>
+        </small></i></p>
+      </div>
+      <div class="flex-shrink-0">
+        <%# todo avatar url %>
+        <img src="" class="rounded" height='40' width='40' onerror="this.style.display='none'">
+      </div>  
+    </div>
+  </div>
+</div>
