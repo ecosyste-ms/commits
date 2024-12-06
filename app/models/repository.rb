@@ -419,6 +419,16 @@ class Repository < ApplicationRecord
     puts "Error syncing commits for #{full_name}: #{e}"
   end
 
+  def committer_records
+    committers.map do |committer|
+      if committer['login'].present?
+        c = host.committers.find_by(login: committer['login']) 
+      end
+      c = host.committers.email(committer['email']).first if c.nil?
+      c
+    end.uniq.compact
+  end
+
   private
 
   def api_client(token = nil, options = {})
