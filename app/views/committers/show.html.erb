@@ -18,7 +18,7 @@
   <% end %>
 
   
-  <% if @repositories.any?%>
+  <% if @repositories %>
     <%= render @repositories %>
     <%== pagy_bootstrap_nav(@pagy) if @pagy.pages > 1 %>  
   <% else %>
