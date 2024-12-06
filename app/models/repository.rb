@@ -140,6 +140,11 @@ class Repository < ApplicationRecord
           # commit_hashes = fetch_commits_internal(repo)
           # Commit.upsert_all(commit_hashes) unless commit_hashes.empty?
           update(counts)
+
+          if committers
+            fetch_all_logins
+            create_committer_join_records
+          end
         end
       rescue => e
         # TODO record error in clone (likely missing repo but also maybe host downtime)
