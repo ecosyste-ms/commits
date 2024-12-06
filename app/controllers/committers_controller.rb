@@ -23,5 +23,7 @@ class CommittersController < ApplicationController
       end
     end
     raise ActiveRecord::RecordNotFound unless @committer
+
+    @pagy, @repositories = pagy_countless(@committer.repositories)
   end
 end
