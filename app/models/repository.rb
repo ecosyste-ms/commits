@@ -421,6 +421,7 @@ class Repository < ApplicationRecord
   end
 
   def committer_records
+    return [] if committers.nil?
     grouped_committers = committers.map do |committer|
       next unless committer['login'].present? || committer['email'].present?
     
