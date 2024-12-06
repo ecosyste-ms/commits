@@ -1,18 +1,4 @@
-class CommittersController < ApplicationController
-  def index
-    @host = Host.find_by_name!(params[:host_id])
-    scope = @host.committers
-
-    sort = params[:sort].presence || 'updated_at'
-    if params[:order] == 'asc'
-      scope = scope.order(Arel.sql(sort).asc.nulls_last)
-    else
-      scope = scope.order(Arel.sql(sort).desc.nulls_last)
-    end
-
-    @pagy, @committers = pagy_countless(scope)
-  end
-
+class Api::V1::CommittersController < Api::V1::ApplicationController
   def show
     @host = Host.find_by_name!(params[:host_id])
     @committer = Committer.find_by_login(params[:id])
@@ -23,5 +9,6 @@ class CommittersController < ApplicationController
       end
     end
     raise ActiveRecord::RecordNotFound unless @committer
+    @pagy, @repositories = pagy_countless(@committer.repositories)
   end
 end

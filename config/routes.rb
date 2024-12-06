@@ -24,6 +24,7 @@ Rails.application.routes.draw do
           end
           resources :commits, only: [:index]
         end
+        resources :committers, constraints: { id: /.*/ }, only: [:show]
       end
     end
   end

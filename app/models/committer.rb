@@ -22,4 +22,8 @@ class Committer < ApplicationRecord
       host.repositories.committer_email(emails.first)
     end
   end
+
+  def repositories_count
+    repositories.count
+  end
 end
