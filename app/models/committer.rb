@@ -29,7 +29,7 @@ class Committer < ApplicationRecord
     repositories.count
   end
 
-  def commits_count
-    contributions.sum(:commit_count)
+  def update_commits_count
+    update(commits_count: contributions.sum(:commit_count))
   end
 end
