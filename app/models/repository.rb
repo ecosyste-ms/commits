@@ -423,6 +423,6 @@ class Repository < ApplicationRecord
 
   def api_client(token = nil, options = {})
     token = fetch_random_token if token.nil?
-    Octokit::Client.new({access_token: token, auto_paginate: true}.merge(options))
+    Octokit::Client.new({access_token: token}.merge(options))
   end
 end
