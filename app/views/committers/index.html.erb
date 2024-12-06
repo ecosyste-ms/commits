@@ -18,13 +18,16 @@
     <li class="nav-item">
       <a class="nav-link" href="<%= host_owners_path(@host) %>" aria-current="page">
         Owners
+                <span class="badge bg-secondary rounded-pill">
+          <%= number_with_delimiter @host.owners_count %>
+        </span>
       </a>
     </li>
     <li class="nav-item">
       <a class="nav-link active" href="<%= host_committers_path(@host) %>">
         Committers
         <span class="badge bg-secondary rounded-pill">
-          <%= number_with_delimiter @host.contributors_count %>
+          <%= number_with_delimiter @host.committers.count %>
         </span>
       </a>
     </li>
