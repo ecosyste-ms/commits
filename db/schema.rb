@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2024_12_07_174329) do
+ActiveRecord::Schema[8.0].define(version: 2024_12_07_174655) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -111,6 +111,7 @@ ActiveRecord::Schema[8.0].define(version: 2024_12_07_174329) do
     t.integer "stargazers_count"
     t.boolean "fork"
     t.boolean "archived"
+    t.string "icon_url"
     t.index "host_id, lower((full_name)::text)", name: "index_repositories_on_host_id_lower_full_name", unique: true
   end
 

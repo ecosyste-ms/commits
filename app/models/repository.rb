@@ -96,6 +96,7 @@ class Repository < ApplicationRecord
     self.stargazers_count = json['stargazers_count']
     self.fork = json['fork']
     self.archived = json['archived']
+    self.icon_url = json['icon_url']
     self.save    
   end
 
