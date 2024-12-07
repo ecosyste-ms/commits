@@ -21,7 +21,7 @@ module ApplicationHelper
   end
 
   def bot?(committer)
-    return false unless committer
+    return false unless committer && committer['name']
     committer['name'].ends_with?('[bot]')
   end
 end
