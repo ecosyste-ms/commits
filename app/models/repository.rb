@@ -92,6 +92,10 @@ class Repository < ApplicationRecord
 
     self.status = json['status']
     self.default_branch = json['default_branch']
+    self.description = json['description']
+    self.stargazers_count = json['stargazers_count']
+    self.fork = json['fork']
+    self.archived = json['archived']
     self.save    
   end
 
