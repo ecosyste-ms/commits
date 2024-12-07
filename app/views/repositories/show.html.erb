@@ -8,6 +8,10 @@
     <%= link_to @repository.full_name, @repository.html_url, target: :_blank %> committers
   </h1>
 
+  <% if @repository.description.present? %>
+    <p><%= @repository.description %></p>
+  <% end %>
+
   <% if @repository.last_synced_at %>
     <p class="card-subtitle mb-2 text-muted"><i><small>
         Last synced: <%= distance_of_time_in_words_to_now @repository.last_synced_at %> ago

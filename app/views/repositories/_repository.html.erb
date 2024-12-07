@@ -9,7 +9,10 @@
             <%= link_to repository, host_repository_path(repository.host, repository) %>
         </h5>
       
-        <%# todo description %>
+        <% if repository.description.present? %>
+          <p><%= repository.description %></p>
+        <% end %>
+        
         <p class="card-subtitle mb-2 text-muted"><i><small>
           Branch: <%= repository.default_branch %><br>
           <% if repository.total_commits %>
@@ -25,8 +28,8 @@
         </small></i></p>
       </div>
       <div class="flex-shrink-0">
-        <%# todo avatar url %>
-        <img src="" class="rounded" height='40' width='40' onerror="this.style.display='none'">
+        
+        <img src="<%= repository.icon_url %>" class="rounded" height='40' width='40' onerror="this.style.display='none'">
       </div>  
     </div>
   </div>
