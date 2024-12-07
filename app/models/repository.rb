@@ -3,7 +3,7 @@ class Repository < ApplicationRecord
 
   has_many :commits
   has_many :contributions
-  has_many :committers, through: :contributions
+  # has_many :committers, through: :contributions
 
   validates :full_name, presence: true
 
