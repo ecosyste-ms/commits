@@ -1,7 +1,7 @@
 class CommittersController < ApplicationController
   def index
     @host = Host.find_by_name!(params[:host_id])
-    scope = @host.committers
+    scope = @host.committers.where('commits_count > 0')
 
     sort = params[:sort].presence || 'updated_at'
     if params[:order] == 'asc'
