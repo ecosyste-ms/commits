@@ -285,7 +285,7 @@ GEM
       actionpack (>= 5.2, < 8.1)
       railties (>= 5.2, < 8.1)
     ruby2_keywords (0.0.5)
-    rugged (1.7.2)
+    rugged (1.9.0)
     sassc (2.4.0)
       ffi (~> 1.9)
     sassc-rails (2.1.2)
