@@ -57,3 +57,5 @@ group :test do
   gem "mocha"
   gem "rails-controller-testing"
 end
+
+gem "bootstrap-icons-helper", "~> 2.0"
