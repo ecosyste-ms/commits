@@ -10,7 +10,7 @@ The project uses ruby on rails which have a number of system dependencies you'll
 
 - [ruby](https://www.ruby-lang.org/en/documentation/installation/)
 - [postgresql 14](https://www.postgresql.org/download/)
-- [node.js 16+](https://nodejs.org/en/download/)
+- [redis 6+](https://redis.io/download/)
 
 Once you've got all of those installed, from the root directory of the project run the following commands:
 
