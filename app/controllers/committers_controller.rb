@@ -10,6 +10,7 @@ class CommittersController < ApplicationController
       scope = scope.order(Arel.sql(sort).desc.nulls_last)
     end
 
+    fresh_when scope, public: true
     @pagy, @committers = pagy_countless(scope)
   end
 
@@ -24,6 +25,7 @@ class CommittersController < ApplicationController
     end
     raise ActiveRecord::RecordNotFound unless @committer
 
+    expires_in 1.week, public: true
     @pagy, @contributions = pagy_countless(@committer.contributions.includes(:repository).order('commit_count desc'))
   end
 end
