@@ -28,6 +28,7 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
     @repository = @host.repositories.find_by('lower(full_name) = ?', path.downcase)
     if @repository
       @repository.sync_async(request.remote_ip) unless @repository.last_synced_at.present? && @repository.last_synced_at > 1.day.ago
+      fresh_when @repository, public: true if @repository
       redirect_to api_v1_host_repository_path(@host, @repository)
     else
       @host.sync_repository_async(path, request.remote_ip) if path.present?
