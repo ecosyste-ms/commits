@@ -30,4 +30,9 @@ class ApiV1RepositoriesControllerTest < ActionDispatch::IntegrationTest
     get api_v1_repositories_lookup_path(url: 'https://github.com/ecosyste-ms/repos/')
     assert_response :redirect
   end
+
+  test 'lookup a repository using git@ SSH format' do
+    get api_v1_repositories_lookup_path(url: 'git@github.com:ecosyste-ms/repos.git')
+    assert_response :redirect
+  end
 end
