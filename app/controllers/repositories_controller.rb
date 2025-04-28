@@ -30,4 +30,9 @@ class RepositoriesController < ApplicationController
       raise ActiveRecord::RecordNotFound unless @repository
     end
   end
+
+  def index
+    @host = Host.find_by_name!(params[:host_id])
+    redirect_to host_path(@host)
+  end
 end
