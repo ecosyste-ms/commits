@@ -263,6 +263,8 @@ components:
     Repository:
       type: object
       properties:
+        id:
+          type: integer
         full_name:
           type: string
         default_branch:
