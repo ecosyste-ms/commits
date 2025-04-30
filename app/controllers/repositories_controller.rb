@@ -40,6 +40,7 @@ class RepositoriesController < ApplicationController
 
   def show
     @host = Host.find_by_name!(params[:host_id])
+    raise ActiveRecord::RecordNotFound unless @host
     @repository = @host.repositories.find_by('lower(full_name) = ?', params[:id].downcase)
     fresh_when @repository, public: true
     if @repository.nil?
