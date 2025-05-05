@@ -25,7 +25,7 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
     host = nil
     path = nil
 
-    if url.start_with?('git@')
+    if url.present? && url.start_with?('git@')
       # Handle SSH format like git@github.com:user/repo.git
       user_host, repo_path = url.split(':', 2)
       host = user_host.split('@').last

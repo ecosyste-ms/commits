@@ -5,7 +5,7 @@ class RepositoriesController < ApplicationController
     host = nil
     path = nil
 
-    if url.start_with?('git@')
+    if url.present? && url.start_with?('git@')
       user_host, repo_path = url.split(':', 2)
       host = user_host.split('@').last
       path = repo_path.delete_suffix('.git').chomp('/')
