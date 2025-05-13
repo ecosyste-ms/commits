@@ -143,7 +143,11 @@ class Repository < ApplicationRecord
     else
       begin
         Dir.mktmpdir do |dir|
-          repo = clone_repository(dir)
+          begin
+            Timeout.timeout(60) { repo = clone_repository(dir) }
+          rescue Timeout::Error
+            raise "Clone timed out"
+          end
           counts = count_commits_internal(dir)
           # commit_hashes = fetch_commits_internal(repo)
           # Commit.upsert_all(commit_hashes) unless commit_hashes.empty?
@@ -155,11 +159,11 @@ class Repository < ApplicationRecord
           end
         end
       rescue => e
-        # TODO record error in clone (likely missing repo but also maybe host downtime)
+        self.status = 'too_large' if e.message.include?('timed out') || e.message.include?('too many committers')
+        self.save
         puts "Error counting commits for #{full_name}: #{e}"
       end
     end
-    
   end
 
   def count_commits_internal(dir)
@@ -169,6 +173,8 @@ class Repository < ApplicationRecord
     past_year_output = `git -C #{dir} shortlog -s -n -e --no-merges --since="1 year ago" HEAD`
 
     committers = parse_commit_counts(output)
+
+    return {} if committers.size > 10000
 
     past_year_committers = parse_commit_counts(past_year_output)
 
