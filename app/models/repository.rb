@@ -100,6 +100,7 @@ class Repository < ApplicationRecord
     self.fork = json['fork']
     self.archived = json['archived']
     self.icon_url = json['icon_url']
+    self.size = json['size']
     self.save    
   end
 
@@ -133,8 +134,20 @@ class Repository < ApplicationRecord
 
   # TODO support hg and svn repos
 
+  def count_refs
+    refs = `git ls-remote --heads --tags #{git_clone_url}`
+    refs.lines.count
+  rescue
+    0
+  end
+
+  def too_large?
+    count_refs > 1000 || (size.present? && size > 500_000)
+  end
+
   def count_commits
     sync_details
+    return if too_large?
     return if status == 'not_found'
     last_commit = fetch_head_sha
 
