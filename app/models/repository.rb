@@ -83,6 +83,7 @@ class Repository < ApplicationRecord
       f.request :json
       f.request :retry
       f.response :json
+      f.headers['User-Agent'] = 'commits.ecosyste.ms'
     end
     response = conn.get
     if response.status == 404
