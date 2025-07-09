@@ -75,4 +75,13 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
     end
     render json: { message: 'pong' }
   end
+
+  def sync_commits
+    @host = Host.find_by_name!(params[:host_id])
+    @repository = @host.repositories.find_by!('lower(full_name) = ?', params[:id].downcase)
+    
+    job_id = SyncCommitsWorker.perform_async(@repository.id)
+    
+    render json: { message: 'Sync commits job has been queued', job_id: job_id }, status: :accepted
+  end
 end

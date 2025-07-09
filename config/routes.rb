@@ -21,6 +21,7 @@ Rails.application.routes.draw do
         resources :repositories, constraints: { id: /.*/ }, only: [:index, :show] do
           member do
             get 'ping', to: 'repositories#ping'
+            post 'sync_commits', to: 'repositories#sync_commits'
           end
           resources :commits, only: [:index]
         end
