@@ -14,8 +14,10 @@ gem "sassc-rails"
 gem "counter_culture"
 gem "faraday"
 gem "faraday-retry"
+gem "faraday-gzip"
 gem "faraday-follow_redirects"
-gem 'faraday-multipart'
+gem "faraday-multipart"
+gem 'faraday-net_http_persistent'
 gem "pagy"
 gem "pghero"
 gem "pg_query"
