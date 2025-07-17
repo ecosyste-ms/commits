@@ -11,7 +11,6 @@ namespace :hosts do
 
   desc 'identify duplicate hosts with different cases'
   task identify_duplicates: :environment do
-    duplicates = Host.all.group_by(&:name).transform_values(&:count).select { |_, count| count > 1 }
     case_duplicates = {}
     
     Host.all.each do |host|
@@ -73,24 +72,41 @@ namespace :hosts do
             
             if existing_repo
               puts "  Merging duplicate repository: #{repo.full_name}"
-              # Merge data from repo into existing_repo
-              existing_repo.update!(
+              # Merge data from repo into existing_repo (only fields that exist)
+              updates = {
                 description: existing_repo.description.blank? ? repo.description : existing_repo.description,
-                language: existing_repo.language.blank? ? repo.language : existing_repo.language,
-                homepage: existing_repo.homepage.blank? ? repo.homepage : existing_repo.homepage,
-                topics: existing_repo.topics.blank? ? repo.topics : existing_repo.topics,
                 fork: existing_repo.fork || repo.fork,
                 archived: existing_repo.archived || repo.archived,
-                pushed_at: [existing_repo.pushed_at, repo.pushed_at].compact.max,
                 last_synced_at: [existing_repo.last_synced_at, repo.last_synced_at].compact.max,
                 total_commits: [existing_repo.total_commits || 0, repo.total_commits || 0].max,
                 total_committers: [existing_repo.total_committers || 0, repo.total_committers || 0].max,
                 stargazers_count: [existing_repo.stargazers_count || 0, repo.stargazers_count || 0].max,
-                watchers_count: [existing_repo.watchers_count || 0, repo.watchers_count || 0].max,
-                forks_count: [existing_repo.forks_count || 0, repo.forks_count || 0].max,
-                open_issues_count: [existing_repo.open_issues_count || 0, repo.open_issues_count || 0].max,
-                size: [existing_repo.size || 0, repo.size || 0].max
-              )
+                size: [existing_repo.size || 0, repo.size || 0].max,
+                icon_url: existing_repo.icon_url.blank? ? repo.icon_url : existing_repo.icon_url,
+                default_branch: existing_repo.default_branch == 'master' ? repo.default_branch : existing_repo.default_branch,
+                last_synced_commit: existing_repo.last_synced_commit.blank? ? repo.last_synced_commit : existing_repo.last_synced_commit,
+                mean_commits: [existing_repo.mean_commits || 0, repo.mean_commits || 0].max,
+                dds: [existing_repo.dds || 0, repo.dds || 0].max,
+                past_year_total_commits: [existing_repo.past_year_total_commits || 0, repo.past_year_total_commits || 0].max,
+                past_year_total_committers: [existing_repo.past_year_total_committers || 0, repo.past_year_total_committers || 0].max,
+                past_year_mean_commits: [existing_repo.past_year_mean_commits || 0, repo.past_year_mean_commits || 0].max,
+                past_year_dds: [existing_repo.past_year_dds || 0, repo.past_year_dds || 0].max,
+                total_bot_commits: [existing_repo.total_bot_commits || 0, repo.total_bot_commits || 0].max,
+                total_bot_committers: [existing_repo.total_bot_committers || 0, repo.total_bot_committers || 0].max,
+                past_year_total_bot_commits: [existing_repo.past_year_total_bot_commits || 0, repo.past_year_total_bot_commits || 0].max,
+                past_year_total_bot_committers: [existing_repo.past_year_total_bot_committers || 0, repo.past_year_total_bot_committers || 0].max
+              }
+              
+              # Handle JSON fields more carefully
+              if existing_repo.committers.nil? || existing_repo.committers.empty?
+                updates[:committers] = repo.committers
+              end
+              
+              if existing_repo.past_year_committers.nil? || existing_repo.past_year_committers.empty?
+                updates[:past_year_committers] = repo.past_year_committers
+              end
+              
+              existing_repo.update!(updates)
               
               # Move commits from repo to existing_repo (handle duplicate SHAs)
               commits_count = repo.commits.count
