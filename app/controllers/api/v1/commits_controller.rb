@@ -1,6 +1,10 @@
 class Api::V1::CommitsController < Api::V1::ApplicationController
+  include HostRedirect
+
   def index
-    @host = Host.find_by_name!(params[:host_id])
+    @host = find_host_with_redirect(params[:host_id])
+    return if performed?
+    
     @repository = @host.repositories.find_by!('lower(full_name) = ?', params[:repository_id].downcase)
 
     scope = @repository.commits.order('timestamp DESC')

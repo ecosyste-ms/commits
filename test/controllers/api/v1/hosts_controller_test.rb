@@ -24,4 +24,28 @@ class ApiV1HostsControllerTest < ActionDispatch::IntegrationTest
 
     assert_equal actual_response["name"], 'GitHub'
   end
+
+  test 'redirect uppercase host names to lowercase' do
+    get api_v1_host_path(id: @host.name.upcase)
+    assert_response :moved_permanently
+    assert_redirected_to api_v1_host_path(@host.name)
+  end
+
+  test 'redirect mixed case host names to lowercase' do
+    mixed_case_name = @host.name.split('.').map(&:capitalize).join('.')
+    get api_v1_host_path(id: mixed_case_name)
+    assert_response :moved_permanently
+    assert_redirected_to api_v1_host_path(@host.name)
+  end
+
+  test 'not redirect exact case matches' do
+    get api_v1_host_path(id: @host.name)
+    assert_response :success
+    assert_template 'hosts/show', file: 'hosts/show.json.jbuilder'
+  end
+
+  test 'return 404 for non-existent hosts with any case' do
+    get api_v1_host_path(id: "NonExistentHost.com")
+    assert_response :not_found
+  end
 end

@@ -15,6 +15,19 @@ class OwnersControllerTest < ActionDispatch::IntegrationTest
       assert_template 'owners/index'
     end
 
+    should "redirect uppercase host names to lowercase" do
+      get host_owners_path(@host.name.upcase)
+      assert_response :moved_permanently
+      assert_redirected_to host_owners_path(@host.name)
+    end
+
+    should "redirect mixed case host names to lowercase" do
+      mixed_case_name = @host.name.split('.').map(&:capitalize).join('.')
+      get host_owners_path(mixed_case_name)
+      assert_response :moved_permanently
+      assert_redirected_to host_owners_path(@host.name)
+    end
+
     should "display all owners with repository counts" do
       get host_owners_path(@host.name)
       assert_response :success
@@ -86,6 +99,19 @@ class OwnersControllerTest < ActionDispatch::IntegrationTest
       get host_owner_path(@host.name, "owner1")
       assert_response :success
       assert_template 'owners/show'
+    end
+
+    should "redirect uppercase host names to lowercase" do
+      get host_owner_path(@host.name.upcase, "owner1")
+      assert_response :moved_permanently
+      assert_redirected_to host_owner_path(@host.name, "owner1")
+    end
+
+    should "redirect mixed case host names to lowercase" do
+      mixed_case_name = @host.name.split('.').map(&:capitalize).join('.')
+      get host_owner_path(mixed_case_name, "owner1")
+      assert_response :moved_permanently
+      assert_redirected_to host_owner_path(@host.name, "owner1")
     end
 
     should "display owner's repositories" do

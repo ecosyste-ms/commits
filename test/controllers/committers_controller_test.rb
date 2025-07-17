@@ -24,6 +24,19 @@ class CommittersControllerTest < ActionDispatch::IntegrationTest
       assert_template 'committers/index'
     end
 
+    should "redirect uppercase host names to lowercase" do
+      get host_committers_path(@host.name.upcase)
+      assert_response :moved_permanently
+      assert_redirected_to host_committers_path(@host.name)
+    end
+
+    should "redirect mixed case host names to lowercase" do
+      mixed_case_name = @host.name.split('.').map(&:capitalize).join('.')
+      get host_committers_path(mixed_case_name)
+      assert_response :moved_permanently
+      assert_redirected_to host_committers_path(@host.name)
+    end
+
     should "only show committers with commits > 0" do
       get host_committers_path(@host.name)
       assert_response :success
@@ -119,6 +132,19 @@ class CommittersControllerTest < ActionDispatch::IntegrationTest
       get host_committer_path(@host.name, @committer1.login)
       assert_response :success
       assert_template 'committers/show'
+    end
+
+    should "redirect uppercase host names to lowercase" do
+      get host_committer_path(@host.name.upcase, @committer1.login)
+      assert_response :moved_permanently
+      assert_redirected_to host_committer_path(@host.name, @committer1.login)
+    end
+
+    should "redirect mixed case host names to lowercase" do
+      mixed_case_name = @host.name.split('.').map(&:capitalize).join('.')
+      get host_committer_path(mixed_case_name, @committer1.login)
+      assert_response :moved_permanently
+      assert_redirected_to host_committer_path(@host.name, @committer1.login)
     end
 
     should "redirect when finding by email" do

@@ -16,4 +16,17 @@ class ApiV1CommitsControllerTest < ActionDispatch::IntegrationTest
 
     assert_equal actual_response.length, 1
   end
+
+  test 'redirect uppercase host names to lowercase' do
+    get api_v1_host_repository_commits_path(host_id: @host.name.upcase, repository_id: @repository.full_name)
+    assert_response :moved_permanently
+    assert_redirected_to api_v1_host_repository_commits_path(@host.name, @repository.full_name)
+  end
+
+  test 'redirect mixed case host names to lowercase' do
+    mixed_case_name = @host.name.split('.').map(&:capitalize).join('.')
+    get api_v1_host_repository_commits_path(host_id: mixed_case_name, repository_id: @repository.full_name)
+    assert_response :moved_permanently
+    assert_redirected_to api_v1_host_repository_commits_path(@host.name, @repository.full_name)
+  end
 end

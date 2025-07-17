@@ -11,6 +11,19 @@ class RepositoriesControllerTest < ActionDispatch::IntegrationTest
       get host_repositories_path(@host.name)
       assert_redirected_to host_path(@host)
     end
+
+    should "redirect uppercase host names to lowercase" do
+      get host_repositories_path(@host.name.upcase)
+      assert_response :moved_permanently
+      assert_redirected_to host_repositories_path(@host.name)
+    end
+
+    should "redirect mixed case host names to lowercase" do
+      mixed_case_name = @host.name.split('.').map(&:capitalize).join('.')
+      get host_repositories_path(mixed_case_name)
+      assert_response :moved_permanently
+      assert_redirected_to host_repositories_path(@host.name)
+    end
   end
 
   context "GET #show" do
@@ -35,6 +48,19 @@ class RepositoriesControllerTest < ActionDispatch::IntegrationTest
     should "return 404 for non-existent host" do
       get host_repository_path(host_id: "NonExistent", id: @repository.full_name)
       assert_response :not_found
+    end
+
+    should "redirect uppercase host names to lowercase" do
+      get host_repository_path(host_id: @host.name.upcase, id: @repository.full_name)
+      assert_response :moved_permanently
+      assert_redirected_to host_repository_path(@host.name, @repository.full_name)
+    end
+
+    should "redirect mixed case host names to lowercase" do
+      mixed_case_name = @host.name.split('.').map(&:capitalize).join('.')
+      get host_repository_path(host_id: mixed_case_name, id: @repository.full_name)
+      assert_response :moved_permanently
+      assert_redirected_to host_repository_path(@host.name, @repository.full_name)
     end
 
     should "sync repository if it doesn't exist" do

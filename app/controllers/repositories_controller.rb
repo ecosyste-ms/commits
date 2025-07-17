@@ -1,4 +1,5 @@
 class RepositoriesController < ApplicationController
+  include HostRedirect
   def lookup
     url = params[:url]
 
@@ -39,8 +40,9 @@ class RepositoriesController < ApplicationController
   end
 
   def show
-    @host = Host.find_by_name!(params[:host_id])
-    raise ActiveRecord::RecordNotFound unless @host
+    @host = find_host_with_redirect(params[:host_id])
+    return if performed?
+    
     @repository = @host.repositories.find_by('lower(full_name) = ?', params[:id].downcase)
     fresh_when @repository, public: true
     if @repository.nil?
@@ -51,7 +53,9 @@ class RepositoriesController < ApplicationController
   end
 
   def index
-    @host = Host.find_by_name!(params[:host_id])
+    @host = find_host_with_redirect(params[:host_id])
+    return if performed?
+    
     redirect_to host_path(@host)
   end
 end

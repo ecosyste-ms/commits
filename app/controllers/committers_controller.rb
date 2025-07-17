@@ -1,6 +1,9 @@
 class CommittersController < ApplicationController
+  include HostRedirect
   def index
-    @host = Host.find_by_name!(params[:host_id])
+    @host = find_host_with_redirect(params[:host_id])
+    return if performed?
+    
     scope = @host.committers.where('commits_count > 0')
 
     sort = params[:sort].presence || 'updated_at'
@@ -15,7 +18,9 @@ class CommittersController < ApplicationController
   end
 
   def show
-    @host = Host.find_by_name!(params[:host_id])
+    @host = find_host_with_redirect(params[:host_id])
+    return if performed?
+    
     @committer = Committer.find_by_login(params[:id])
     if @committer.nil?
       @committer = Committer.email(params[:id]).first 

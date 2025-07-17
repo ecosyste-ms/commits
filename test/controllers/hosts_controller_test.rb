@@ -147,5 +147,29 @@ class HostsControllerTest < ActionDispatch::IntegrationTest
       get host_path(special_host.name)
       assert_response :success
     end
+
+    should "redirect uppercase host names to lowercase" do
+      get host_path(@host.name.upcase)
+      assert_response :moved_permanently
+      assert_redirected_to host_path(@host.name)
+    end
+
+    should "redirect mixed case host names to lowercase" do
+      mixed_case_name = @host.name.split('.').map(&:capitalize).join('.')
+      get host_path(mixed_case_name)
+      assert_response :moved_permanently
+      assert_redirected_to host_path(@host.name)
+    end
+
+    should "not redirect exact case matches" do
+      get host_path(@host.name)
+      assert_response :success
+      assert_template 'hosts/show'
+    end
+
+    should "return 404 for non-existent hosts with any case" do
+      get host_path("NonExistentHost.com")
+      assert_response :not_found
+    end
   end
 end
