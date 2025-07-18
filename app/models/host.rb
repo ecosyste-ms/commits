@@ -2,7 +2,7 @@ class Host < ApplicationRecord
   has_many :repositories
   has_many :committers
 
-  validates :name, presence: true, uniqueness: true
+  validates :name, presence: true, uniqueness: { case_sensitive: false }
   validates :url, presence: true
   validates :kind, presence: true
 
