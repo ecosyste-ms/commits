@@ -7,6 +7,7 @@ class Host < ApplicationRecord
   validates :kind, presence: true
 
   scope :visible, -> { where('repositories_count > 0 AND commits_count > 0') }
+  scope :indexable, -> { where(online: true, can_crawl_api: true) }
 
   def self.find_by_domain(domain)
     Host.all.find { |host| host.domain == domain }
@@ -29,6 +30,20 @@ class Host < ApplicationRecord
     name.downcase != kind
   end
 
+  def online?
+    online
+  end
+
+  def can_be_indexed?
+    online? && can_crawl_api?
+  end
+
+  def status_display
+    return 'Online' if online?
+    return 'Offline' unless online?
+    status&.humanize || 'Unknown'
+  end
+
   def sync_repository_async(full_name, remote_ip = '0.0.0.0')
     repo = self.repositories.find_by('lower(full_name) = ?', full_name.downcase)
     repo = self.repositories.create(full_name: full_name) if repo.nil?
@@ -41,6 +56,8 @@ class Host < ApplicationRecord
   end
 
   def sync_recently_updated_repositories_async
+    return nil unless can_be_indexed?
+    
     conn = Faraday.new('https://repos.ecosyste.ms') do |f|
       f.request :json
       f.request :retry
@@ -87,6 +104,15 @@ class Host < ApplicationRecord
         r.url = host['url']
         r.kind = host['kind']
         r.icon_url = host['icon_url']
+        r.status = host['status']
+        r.online = host['online']
+        r.status_checked_at = host['status_checked_at'] ? Time.parse(host['status_checked_at']) : nil
+        r.response_time = host['response_time']
+        r.last_error = host['last_error']
+        r.can_crawl_api = host['can_crawl_api']
+        r.host_url = host['host_url']
+        r.repositories_url = host['repositories_url']
+        r.owners_url = host['owners_url']
         r.last_synced_at = Time.now
         r.save
       end

@@ -12,6 +12,16 @@
           <% if host.display_kind? %>
             <i><small class="text-muted"><%= host.kind %></small></i>
           <% end %>
+          
+          <% if host.online? %>
+            <span class="badge bg-success ms-2">Online</span>
+          <% else %>
+            <span class="badge bg-warning ms-2">Offline</span>
+          <% end %>
+          
+          <% unless host.can_crawl_api? %>
+            <span class="badge bg-danger ms-1">API Blocked</span>
+          <% end %>
         </h5>
       
         <p class="card-subtitle mb-2 text-muted">

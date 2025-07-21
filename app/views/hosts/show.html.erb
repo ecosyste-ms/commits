@@ -4,7 +4,25 @@
 <div class="container-sm">
   <h1 class='mb-4'>
     <%= link_to @host, @host.url, target: :_blank %> Repositories
+    <% if @host.online? %>
+      <span class="badge bg-success">Online</span>
+    <% else %>
+      <span class="badge bg-warning">Offline</span>
+    <% end %>
+    
+    <% unless @host.can_crawl_api? %>
+      <span class="badge bg-danger">API Blocked</span>
+    <% end %>
   </h1>
+
+  <% if @host.last_error.present? %>
+    <div class="alert alert-warning" role="alert">
+      <strong>Status Error:</strong> <%= @host.last_error %>
+      <% if @host.status_checked_at %>
+        <small class="text-muted">(checked <%= time_ago_in_words(@host.status_checked_at) %> ago)</small>
+      <% end %>
+    </div>
+  <% end %>
 
   <ul class="nav nav-tabs my-3">
     <li class="nav-item">

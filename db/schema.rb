@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_05_14_153855) do
+ActiveRecord::Schema[8.0].define(version: 2025_07_21_150011) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -70,6 +70,15 @@ ActiveRecord::Schema[8.0].define(version: 2025_05_14_153855) do
     t.bigint "contributors_count"
     t.string "icon_url"
     t.bigint "owners_count", default: 0
+    t.string "status", default: "pending"
+    t.boolean "online", default: true
+    t.datetime "status_checked_at"
+    t.float "response_time"
+    t.text "last_error"
+    t.boolean "can_crawl_api", default: true
+    t.text "host_url"
+    t.text "repositories_url"
+    t.text "owners_url"
   end
 
   create_table "jobs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|

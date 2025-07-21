@@ -8,6 +8,11 @@ FactoryBot.define do
     commits_count { 1000 }
     contributors_count { 50 }
     owners_count { 5 }
+    status { 'ok' }
+    online { true }
+    can_crawl_api { true }
+    status_checked_at { 1.hour.ago }
+    response_time { 0.5 }
     
     trait :with_repositories do
       after(:create) do |host|
@@ -18,6 +23,17 @@ FactoryBot.define do
     trait :invisible do
       repositories_count { 0 }
       commits_count { 0 }
+    end
+    
+    trait :offline do
+      online { false }
+      status { 'error' }
+      last_error { 'Connection timeout' }
+    end
+    
+    trait :api_blocked do
+      can_crawl_api { false }
+      last_error { 'Blocked by robots.txt' }
     end
     
     trait :github do
