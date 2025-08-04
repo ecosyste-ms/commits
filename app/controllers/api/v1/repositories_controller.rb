@@ -30,7 +30,10 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
 
     if url.present? && url.start_with?('git@')
       # Handle SSH format like git@github.com:user/repo.git
-      user_host, repo_path = url.split(':', 2)
+      parts = url.split(':', 2)
+      raise ActiveRecord::RecordNotFound unless parts.length == 2 && parts[1].present?
+      
+      user_host, repo_path = parts
       host = user_host.split('@').last
       path = repo_path.delete_suffix('.git').chomp('/')
     else

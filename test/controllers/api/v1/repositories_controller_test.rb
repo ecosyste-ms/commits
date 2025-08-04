@@ -61,4 +61,14 @@ class ApiV1RepositoriesControllerTest < ActionDispatch::IntegrationTest
     get api_v1_repositories_lookup_path(url: 'git@github.com:ecosyste-ms/repos.git')
     assert_response :redirect
   end
+
+  test 'lookup handles malformed SSH URL without colon' do
+    get api_v1_repositories_lookup_path(url: 'git@github.com')
+    assert_response :not_found
+  end
+
+  test 'lookup handles malformed SSH URL with empty path' do
+    get api_v1_repositories_lookup_path(url: 'git@github.com:')
+    assert_response :not_found
+  end
 end
