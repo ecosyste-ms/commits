@@ -222,9 +222,19 @@ class Repository < ApplicationRecord
 
   def count_commits_internal(dir)
     last_commit = `git -C #{dir} rev-parse HEAD`.strip
-    output = `git -C #{dir} shortlog -s -n -e --no-merges HEAD`      
+    output = `git -C #{dir} shortlog -s -n -e --no-merges HEAD`
+    # Force UTF-8 encoding and replace invalid characters
+    output = output.force_encoding('UTF-8')
+    unless output.valid_encoding?
+      output = output.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
+    end
 
     past_year_output = `git -C #{dir} shortlog -s -n -e --no-merges --since="1 year ago" HEAD`
+    # Force UTF-8 encoding and replace invalid characters
+    past_year_output = past_year_output.force_encoding('UTF-8')
+    unless past_year_output.valid_encoding?
+      past_year_output = past_year_output.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
+    end
 
     committers = parse_commit_counts(output)
 
@@ -273,8 +283,11 @@ class Repository < ApplicationRecord
       count, author = line.split("\t")
       name, email = author.split("<")
       email.gsub!(/[<>]/, '')
+      # Remove null characters from name and email
+      name = name.strip.gsub("\u0000", '') if name
+      email = email.gsub("\u0000", '') if email
       login = fetch_existing_login(email)
-      { name: name.strip, email: email, login: login, count: count.to_i }
+      { name: name, email: email, login: login, count: count.to_i }
     end
 
     c = lines.group_by{|h| h[:email]}.map do |email, lines|
@@ -494,6 +507,11 @@ class Repository < ApplicationRecord
     end
     
     output = `#{git_cmd.shelljoin} 2>/dev/null`
+    # Force UTF-8 encoding and replace invalid characters
+    output = output.force_encoding('UTF-8')
+    unless output.valid_encoding?
+      output = output.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
+    end
     
     commits = []
     repo_id = id
@@ -527,11 +545,11 @@ class Repository < ApplicationRecord
       commits << {
         repository_id: repo_id,
         sha: sha,
-        message: message.strip,
+        message: message.strip.gsub("\u0000", ''),
         timestamp: timestamp,
         merge: parents.include?(' '),
-        author: "#{author_name} <#{author_email}>",
-        committer: "#{committer_name} <#{committer_email}>",
+        author: "#{author_name} <#{author_email}>".gsub("\u0000", ''),
+        committer: "#{committer_name} <#{committer_email}>".gsub("\u0000", ''),
         stats: [additions, deletions, files]
       }
     end
@@ -559,6 +577,11 @@ class Repository < ApplicationRecord
     end
     
     output = `#{git_cmd.shelljoin} 2>/dev/null`
+    # Force UTF-8 encoding and replace invalid characters
+    output = output.force_encoding('UTF-8')
+    unless output.valid_encoding?
+      output = output.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
+    end
     
     commits = []
     repo_id = id # Cache to avoid repeated method calls
@@ -595,11 +618,11 @@ class Repository < ApplicationRecord
       commits << {
         repository_id: repo_id,
         sha: sha,
-        message: message.strip,
+        message: message.strip.gsub("\u0000", ''),
         timestamp: timestamp,
         merge: parents.include?(' '),
-        author: "#{author_name} <#{author_email}>",
-        committer: "#{committer_name} <#{committer_email}>",
+        author: "#{author_name} <#{author_email}>".gsub("\u0000", ''),
+        committer: "#{committer_name} <#{committer_email}>".gsub("\u0000", ''),
         stats: [additions, deletions, files]
       }
     end
@@ -611,6 +634,17 @@ class Repository < ApplicationRecord
     Timeout.timeout(900) do
       commit_hashes = fetch_commits
       return if commit_hashes.empty?
+      
+      # Clean commit data to remove null bytes
+      commit_hashes = commit_hashes.map do |commit|
+        commit.transform_values do |value|
+          if value.is_a?(String)
+            value.gsub("\u0000", '')
+          else
+            value
+          end
+        end
+      end
       
       # Batch insert for better performance
       commit_hashes.each_slice(1000) do |batch|
@@ -641,9 +675,20 @@ class Repository < ApplicationRecord
         # Track the latest commit SHA from first batch
         latest_sha ||= batch.first[:sha]
         
+        # Clean commit data to remove null bytes
+        cleaned_batch = batch.map do |commit|
+          commit.transform_values do |value|
+            if value.is_a?(String)
+              value.gsub("\u0000", '')
+            else
+              value
+            end
+          end
+        end
+        
         # Efficient bulk insert with conflict resolution
         Commit.upsert_all(
-          batch,
+          cleaned_batch,
           returning: false,
           record_timestamps: false
         )

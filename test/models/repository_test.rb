@@ -60,6 +60,117 @@ class RepositoryTest < ActiveSupport::TestCase
     end
   end
 
+  test "sync_commits handles UTF-8 encoding issues" do
+    # Create commits with null bytes (which our code should clean)
+    test_commits = [
+      {
+        repository_id: @repository.id,
+        sha: "abc123",
+        message: "Test commit with null \u0000 chars",
+        timestamp: Time.now.iso8601,
+        merge: false,
+        author: "Test Author\u0000 <test@example.com>",
+        committer: "Test Committer <test@example.com>",
+        stats: [1, 1, 2]
+      },
+      {
+        repository_id: @repository.id,
+        sha: "def456",
+        message: "Normal commit",
+        timestamp: Time.now.iso8601,
+        merge: false,
+        author: "Normal Author <normal@example.com>",
+        committer: "Normal Committer <normal@example.com>",
+        stats: [2, 3, 1]
+      }
+    ]
+    
+    @repository.stubs(:fetch_commits).returns(test_commits)
+    
+    # Should not raise encoding errors
+    assert_nothing_raised do
+      @repository.sync_commits
+    end
+    
+    # Verify commits were inserted
+    assert_equal "abc123", @repository.reload.last_synced_commit
+  end
+
+  test "sync_commits handles general errors with proper logging" do
+    error_message = "Some database error"
+    @repository.stubs(:fetch_commits).raises(StandardError.new(error_message))
+    Rails.logger.expects(:error).with("Error syncing commits for test/repo: #{error_message}")
+    
+    assert_raises(Repository::SyncError) do
+      @repository.sync_commits
+    end
+  end
+
+  test "sync_commits updates last_synced_commit after successful sync" do
+    test_commits = [
+      {
+        repository_id: @repository.id,
+        sha: "latest123",
+        message: "Latest commit",
+        timestamp: Time.now.iso8601,
+        merge: false,
+        author: "Test Author <test@example.com>",
+        committer: "Test Committer <test@example.com>",
+        stats: [1, 1, 1]
+      },
+      {
+        repository_id: @repository.id,
+        sha: "older456",
+        message: "Older commit",
+        timestamp: 1.day.ago.iso8601,
+        merge: false,
+        author: "Test Author <test@example.com>",
+        committer: "Test Committer <test@example.com>",
+        stats: [2, 2, 2]
+      }
+    ]
+    
+    @repository.stubs(:fetch_commits).returns(test_commits)
+    
+    @repository.sync_commits
+    
+    assert_equal "latest123", @repository.reload.last_synced_commit
+  end
+
+  test "sync_commits handles empty commit list" do
+    @repository.stubs(:fetch_commits).returns([])
+    
+    assert_nothing_raised do
+      @repository.sync_commits
+    end
+    
+    # Should not update last_synced_commit when no commits
+    assert_nil @repository.reload.last_synced_commit
+  end
+
+  test "sync_commits batches large commit lists" do
+    # Create 2500 test commits to test batching (batch size is 1000)
+    test_commits = (1..2500).map do |i|
+      {
+        repository_id: @repository.id,
+        sha: "sha#{i}",
+        message: "Commit #{i}",
+        timestamp: Time.now.iso8601,
+        merge: false,
+        author: "Author #{i} <author#{i}@example.com>",
+        committer: "Committer #{i} <committer#{i}@example.com>",
+        stats: [i, i, i]
+      }
+    end
+    
+    @repository.stubs(:fetch_commits).returns(test_commits)
+    
+    # Expect upsert_all to be called 3 times (2500/1000 = 2.5, so 3 batches)
+    Commit.expects(:upsert_all).times(3)
+    
+    @repository.sync_commits
+  end
+
   # Git log tests
   test "fetch_commits_internal parses git log output correctly" do
     Dir.mktmpdir do |dir|
