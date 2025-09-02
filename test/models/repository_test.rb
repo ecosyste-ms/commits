@@ -561,4 +561,94 @@ class RepositoryTest < ActiveSupport::TestCase
       assert_equal @host.id, repo.host_id
     end
   end
+
+  # Tests for deleted repository handling
+  test "clone_repository marks repository as not_found when deleted from GitHub" do
+    Dir.mktmpdir do |dir|
+      # Stub the git clone command to simulate a deleted repository error
+      Open3.stubs(:capture3).with(anything) do |cmd|
+        if cmd.include?("git clone")
+          ["", "fatal: could not read Username for 'https://github.com': No such device or address", double(success?: false)]
+        else
+          ["", "", double(success?: true)]
+        end
+      end
+      
+      # Use the shell command approach that matches the actual implementation
+      output = "fatal: could not read Username for 'https://github.com': No such device or address"
+      @repository.stubs(:`).returns(output)
+      `exit 1` # Set $? to indicate failure
+      
+      error = assert_raises(Repository::CloneError) do
+        @repository.clone_repository(dir)
+      end
+      
+      assert_match(/appears to be deleted or private/, error.message)
+      assert_equal 'not_found', @repository.reload.status
+    end
+  end
+
+  test "clone_repository marks repository as not_found when repository not found" do
+    Dir.mktmpdir do |dir|
+      # Stub the git clone command to simulate a repository not found error
+      output = "ERROR: Repository not found."
+      @repository.stubs(:`).returns(output)
+      `exit 1` # Set $? to indicate failure
+      
+      error = assert_raises(Repository::CloneError) do
+        @repository.clone_repository(dir)
+      end
+      
+      assert_match(/appears to be deleted or private/, error.message)
+      assert_equal 'not_found', @repository.reload.status
+    end
+  end
+
+  test "clone_repository raises regular CloneError for other failures" do
+    Dir.mktmpdir do |dir|
+      # Stub the git clone command to simulate a different error
+      output = "fatal: unable to access 'https://github.com/test/repo.git/': Connection timed out"
+      @repository.stubs(:`).returns(output)
+      `exit 1` # Set $? to indicate failure
+      
+      error = assert_raises(Repository::CloneError) do
+        @repository.clone_repository(dir)
+      end
+      
+      assert_match(/Connection timed out/, error.message)
+      # Should not change status for other errors
+      assert_not_equal 'not_found', @repository.reload.status
+    end
+  end
+
+  test "sync_commits skips repositories marked as not_found" do
+    @repository.update(status: 'not_found')
+    
+    # Should not attempt to fetch commits
+    @repository.expects(:fetch_commits).never
+    @repository.expects(:sync_commits_incremental).never
+    @repository.expects(:sync_commits_regular).never
+    
+    result = @repository.sync_commits
+    
+    assert_nil result
+  end
+
+  test "sync_commits processes normally when status is nil" do
+    @repository.update(status: nil)
+    @repository.stubs(:sync_commits_incremental).returns(10)
+    
+    result = @repository.sync_commits(incremental: true)
+    
+    assert_equal 10, result
+  end
+
+  test "sync_commits processes normally when status is not 'not_found'" do
+    @repository.update(status: 'active')
+    @repository.stubs(:sync_commits_incremental).returns(10)
+    
+    result = @repository.sync_commits(incremental: true)
+    
+    assert_equal 10, result
+  end
 end

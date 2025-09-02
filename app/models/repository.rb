@@ -170,7 +170,14 @@ class Repository < ApplicationRecord
 
   def clone_repository(dir)
     output = `git clone --quiet #{git_clone_url.shellescape} #{dir.shellescape} 2>&1`
-    raise CloneError, "Failed to clone #{full_name}: #{output}" unless $?.success?
+    unless $?.success?
+      # Check if the repository has been deleted from GitHub
+      if output.include?("could not read Username") || output.include?("Repository not found")
+        update_column(:status, 'not_found')
+        raise CloneError, "Repository #{full_name} appears to be deleted or private"
+      end
+      raise CloneError, "Failed to clone #{full_name}: #{output}"
+    end
   end
 
   # TODO support hg and svn repos
@@ -632,6 +639,9 @@ class Repository < ApplicationRecord
   end
 
   def sync_commits(incremental: true)
+    # Skip syncing if repository is not found
+    return if status == 'not_found'
+    
     if incremental
       # Use incremental sync by default for better performance and resumability
       sync_commits_incremental
