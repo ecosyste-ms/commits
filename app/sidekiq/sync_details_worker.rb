@@ -1,4 +1,4 @@
-class SyncCommitsWorker
+class SyncDetailsWorker
   include Sidekiq::Worker
   include Sidekiq::Status::Worker
 
@@ -8,17 +8,13 @@ class SyncCommitsWorker
     repository = Repository.find_by_id(repository_id)
     return unless repository
 
-    # Enqueue the three separate jobs instead of running them directly
-    # Pass through the priority setting to child workers
-    SyncDetailsWorker.perform_async(repository_id, high_priority)
-    SyncCommitsDataWorker.perform_async(repository_id, high_priority)
-    CountCommitsWorker.perform_async(repository_id, high_priority)
+    repository.sync_details
   end
 
   def self.perform_async(*args)
     repository_id = args[0]
     high_priority = args[1] || false
-    queue = high_priority ? 'high_priority' : 'default'
+    queue = high_priority ? 'sync_details_high_priority' : 'sync_details'
     Sidekiq::Client.push('class' => self, 'queue' => queue, 'args' => [repository_id, high_priority])
   end
 end

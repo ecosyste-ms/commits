@@ -92,7 +92,7 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
     
     @repository = @host.repositories.find_by!('lower(full_name) = ?', params[:id].downcase)
     
-    job_id = SyncCommitsWorker.perform_async(@repository.id)
+    job_id = SyncCommitsDataWorker.perform_async(@repository.id, true)
     
     render json: { message: 'Sync commits job has been queued', job_id: job_id }, status: :accepted
   end

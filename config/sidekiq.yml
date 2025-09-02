@@ -1,4 +1,10 @@
 ---
 :queues:
   - [high_priority, 2]
+  - [sync_details_high_priority, 2]
+  - [sync_commits_data_high_priority, 2]
+  - [count_commits_high_priority, 2]
+  - sync_details
+  - sync_commits_data
+  - count_commits
   - default
