@@ -23,7 +23,7 @@ class RepositoryTest < ActiveSupport::TestCase
   # Timeout tests
   test "sync_commits handles timeout properly" do
     @repository.stubs(:fetch_commits).raises(Timeout::Error)
-    Rails.logger.expects(:error).with("Sync commits timeout for test/repo after 15 minutes")
+    Rails.logger.expects(:error).with("Sync commits timeout for test/repo after 5 minutes")
     
     assert_raises(Repository::TimeoutError) do
       @repository.sync_commits(incremental: false)
@@ -53,7 +53,7 @@ class RepositoryTest < ActiveSupport::TestCase
 
   test "sync_commits logs error message on timeout" do
     @repository.stubs(:fetch_commits).raises(Timeout::Error)
-    Rails.logger.expects(:error).with("Sync commits timeout for test/repo after 15 minutes")
+    Rails.logger.expects(:error).with("Sync commits timeout for test/repo after 5 minutes")
     
     assert_raises(Repository::TimeoutError) do
       @repository.sync_commits(incremental: false)
@@ -312,7 +312,7 @@ class RepositoryTest < ActiveSupport::TestCase
     
     # Stub Time.now to simulate timeout after first batch
     current_time = Time.now
-    Time.stubs(:now).returns(current_time, current_time + 16.minutes)
+    Time.stubs(:now).returns(current_time, current_time + 6.minutes)
     
     # Stub the git rev-parse HEAD command (called when timeout occurs)
     @repository.stubs(:`).with { |cmd| cmd.include?("git rev-parse HEAD") }.returns("sha1\n")

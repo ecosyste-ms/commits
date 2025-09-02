@@ -169,7 +169,10 @@ class Repository < ApplicationRecord
   end
 
   def clone_repository(dir)
-    output = `git clone --quiet #{git_clone_url.shellescape} #{dir.shellescape} 2>&1`
+    # Use --filter=blob:none to skip file contents (we only need commit history)
+    # Use --no-checkout to avoid creating working files
+    # This significantly speeds up cloning large repositories
+    output = `git clone --filter=blob:none --no-checkout --quiet #{git_clone_url.shellescape} #{dir.shellescape} 2>&1`
     unless $?.success?
       # Check if the repository has been deleted from GitHub
       if output.include?("could not read Username") || output.include?("Repository not found")
@@ -659,7 +662,7 @@ class Repository < ApplicationRecord
   end
   
   def sync_commits_regular
-    Timeout.timeout(900) do
+    Timeout.timeout(300) do
       commit_hashes = fetch_commits
       return if commit_hashes.empty?
       
@@ -689,8 +692,8 @@ class Repository < ApplicationRecord
       end
     end
   rescue Timeout::Error => e
-    Rails.logger.error "Sync commits timeout for #{full_name} after 15 minutes"
-    raise TimeoutError, "Sync commits timed out for #{full_name} after 15 minutes"
+    Rails.logger.error "Sync commits timeout for #{full_name} after 5 minutes"
+    raise TimeoutError, "Sync commits timed out for #{full_name} after 5 minutes"
   rescue => e
     Rails.logger.error "Error syncing commits for #{full_name}: #{e.message}"
     # For other errors, we might want to retry, so we still raise
@@ -699,7 +702,7 @@ class Repository < ApplicationRecord
   
   def sync_commits_incremental
     start_time = Time.now
-    timeout_duration = 900 # 15 minutes
+    timeout_duration = 300 # 5 minutes
     total_processed = 0
     
     Dir.mktmpdir do |dir|
@@ -925,7 +928,7 @@ class Repository < ApplicationRecord
   end
   
   def sync_commits_streaming
-    Timeout.timeout(900) do
+    Timeout.timeout(300) do
       latest_sha = nil
       total_processed = 0
       
@@ -969,8 +972,8 @@ class Repository < ApplicationRecord
       total_processed
     end
   rescue Timeout::Error => e
-    Rails.logger.error "Sync commits streaming timeout for #{full_name} after 15 minutes"
-    raise TimeoutError, "Sync commits streaming timed out for #{full_name} after 15 minutes"
+    Rails.logger.error "Sync commits streaming timeout for #{full_name} after 5 minutes"
+    raise TimeoutError, "Sync commits streaming timed out for #{full_name} after 5 minutes"
   rescue => e
     Rails.logger.error "Error in streaming sync for #{full_name}: #{e.message}"
     raise SyncError, "Failed to sync commits (streaming) for #{full_name}: #{e.message}"
