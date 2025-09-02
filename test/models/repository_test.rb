@@ -177,12 +177,16 @@ class RepositoryTest < ActiveSupport::TestCase
     @repository.stubs(:get_oldest_commit_date).returns(2.months.ago)
     @repository.stubs(:get_newest_commit_date).returns(Time.now)
     
-    # Mock fetch_commits_by_date_range to return some commits
+    # Mock fetch_commits_by_date_range to return some commits only for the first call
+    # then empty arrays for subsequent calls (since we process multiple months)
     commits_batch = [
       { repository_id: @repository.id, sha: "abc123", message: "Test", timestamp: Time.now.iso8601,
         merge: false, author: "Test <test@test.com>", committer: "Test <test@test.com>", stats: [1,1,1] }
     ]
-    @repository.stubs(:fetch_commits_by_date_range).returns(commits_batch)
+    @repository.stubs(:fetch_commits_by_date_range).returns(commits_batch, [], [])
+    
+    # Stub the git rev-parse HEAD command
+    @repository.stubs(:`).with { |cmd| cmd.include?("git rev-parse HEAD") }.returns("abc123\n")
     
     result = @repository.sync_commits_incremental
     
@@ -273,7 +277,10 @@ class RepositoryTest < ActiveSupport::TestCase
     ]
     
     # Stub fetch_commits_by_date_range to return appropriate batches
-    @repository.stubs(:fetch_commits_by_date_range).returns(batch1, batch2, batch3, batch4)
+    @repository.stubs(:fetch_commits_by_date_range).returns(batch4, batch3, batch2, batch1)
+    
+    # Stub the git rev-parse HEAD command
+    @repository.stubs(:`).with { |cmd| cmd.include?("git rev-parse HEAD") }.returns("sha1\n")
     
     # Stub Commit.upsert_all
     Commit.stubs(:upsert_all)
@@ -306,6 +313,9 @@ class RepositoryTest < ActiveSupport::TestCase
     # Stub Time.now to simulate timeout after first batch
     current_time = Time.now
     Time.stubs(:now).returns(current_time, current_time + 16.minutes)
+    
+    # Stub the git rev-parse HEAD command (called when timeout occurs)
+    @repository.stubs(:`).with { |cmd| cmd.include?("git rev-parse HEAD") }.returns("sha1\n")
     
     # Stub Commit.upsert_all to avoid database operations
     Commit.stubs(:upsert_all)

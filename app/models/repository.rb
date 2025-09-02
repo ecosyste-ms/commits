@@ -644,7 +644,15 @@ class Repository < ApplicationRecord
     
     if incremental
       # Use incremental sync by default for better performance and resumability
-      sync_commits_incremental
+      result = sync_commits_incremental
+      
+      # Handle timeout as partial progress
+      if result == :timeout
+        Rails.logger.info "Incremental sync made partial progress for #{full_name}"
+        return true
+      end
+      
+      result
     else
       sync_commits_regular
     end
@@ -693,7 +701,6 @@ class Repository < ApplicationRecord
     start_time = Time.now
     timeout_duration = 900 # 15 minutes
     total_processed = 0
-    latest_sha = nil
     
     Dir.mktmpdir do |dir|
       clone_repository(dir)
@@ -729,32 +736,37 @@ class Repository < ApplicationRecord
         Rails.logger.info "No existing commits found, starting fresh sync"
       end
       
-      # Process commits in monthly batches, from newest to oldest
+      # Process commits in monthly batches, from oldest to newest
+      # This ensures we build history chronologically
       # Add a day buffer to ensure we catch commits on the exact dates
-      current_date = newest_commit_date + 1.day
+      current_date = oldest_commit_date - 1.day
       
-      while current_date >= oldest_commit_date
+      while current_date <= newest_commit_date
         # Check for timeout
         if Time.now - start_time > timeout_duration
           Rails.logger.warn "Incremental sync timeout for #{full_name} after processing #{total_processed} commits"
           
-          # Save progress if we processed any commits
-          if latest_sha
-            update_columns(
-              last_synced_commit: latest_sha,
-              last_synced_at: Time.current
-            )
+          # Save progress if we processed any commits  
+          if total_processed > 0
+            # Get the current HEAD to mark where we got to
+            head_sha = `cd #{dir} && git rev-parse HEAD 2>/dev/null`.strip
+            if head_sha.present?
+              update_columns(
+                last_synced_commit: head_sha,
+                last_synced_at: Time.current
+              )
+            end
           end
           
           return :timeout
         end
         
         # Define the date range for this batch (1 month)
-        since_date = current_date - 1.month
-        until_date = current_date
+        since_date = current_date
+        until_date = current_date + 1.month
         
-        # Make sure we don't go before the oldest commit
-        since_date = [since_date, oldest_commit_date - 1.day].max
+        # Make sure we don't go beyond the newest commit
+        until_date = [until_date, newest_commit_date + 1.day].min
         
         Rails.logger.info "Fetching commits from #{since_date} to #{until_date} for #{full_name}"
         
@@ -764,9 +776,6 @@ class Repository < ApplicationRecord
         Rails.logger.info "Found #{batch.size} commits in this batch"
         
         if batch.any?
-          # Track the latest commit SHA from first batch
-          latest_sha ||= batch.first[:sha]
-          
           # Clean and insert batch
           cleaned_batch = batch.map do |commit|
             commit.transform_values do |value|
@@ -791,14 +800,17 @@ class Repository < ApplicationRecord
           Rails.logger.info "Processed #{batch.size} commits from #{since_date.to_date} to #{until_date.to_date} for #{full_name}"
         end
         
-        # Move to the previous month
-        current_date = since_date
+        # Move to the next month
+        current_date = until_date
       end
       
-      # Update tracking info
-      if latest_sha
+      # Get HEAD commit SHA since we processed from oldest to newest
+      head_sha = `cd #{dir} && git rev-parse HEAD 2>/dev/null`.strip
+      
+      # Update tracking info with HEAD
+      if head_sha.present?
         update_columns(
-          last_synced_commit: latest_sha,
+          last_synced_commit: head_sha,
           last_synced_at: Time.current
         )
       end
