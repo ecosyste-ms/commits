@@ -51,25 +51,10 @@ class Job < ApplicationRecord
   end
 
   def parse_commits
-    # find repo from repos service
-    conn = Faraday.new('https://repos.ecosyste.ms') do |f|
-      f.request :json
-      f.request :retry
-      f.response :json
-      f.headers['User-Agent'] = 'commits.ecosyste.ms'
-    end
-    
-    response = conn.get("api/v1/repositories/lookup?url=#{CGI.escape(url)}")
-    return nil unless response.success?
-    json = response.body
-
-    host = Host.find_by(name: json['host']['name'])
-    repo = host.repositories.find_by('lower(full_name) = ?', json['full_name'].downcase)
-    repo = host.repositories.create(full_name: json['full_name']) if repo.nil?
+    repo = Repository.find_or_create_from_url(url)
+    return nil unless repo
     
     repo.count_commits
-    
-    results = repo.as_json
-    return results
+    repo.as_json
   end
 end

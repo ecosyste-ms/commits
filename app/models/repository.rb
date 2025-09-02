@@ -1,4 +1,7 @@
 class Repository < ApplicationRecord
+  class CloneError < StandardError; end
+  class TimeoutError < StandardError; end
+  class SyncError < StandardError; end
   belongs_to :host
 
   has_many :commits
@@ -38,6 +41,42 @@ class Repository < ApplicationRecord
 
   def self.sync_least_recently_synced
     Repository.active.order('last_synced_at ASC').limit(100).each(&:sync_async)
+  end
+
+  def self.find_or_create_from_host(host, full_name)
+    host.repositories.find_by('lower(full_name) = ?', full_name.downcase) ||
+      host.repositories.create!(full_name: full_name)
+  end
+
+  def self.find_or_create_from_url(url)
+    # Parse URL to extract host and repo name
+    if url =~ /https?:\/\/([^\/]+)\/(.+)/
+      host_name = $1
+      full_name = $2.sub(/\.git$/, '') # Remove .git suffix if present
+      
+      host = Host.find_by(name: host_name)
+      return nil unless host
+      
+      repo = host.repositories.find_by('lower(full_name) = ?', full_name.downcase)
+      return repo if repo
+    end
+    
+    # If not found locally, try external API
+    conn = Faraday.new('https://repos.ecosyste.ms') do |f|
+      f.request :json
+      f.request :retry
+      f.response :json
+      f.headers['User-Agent'] = 'commits.ecosyste.ms'
+    end
+    
+    response = conn.get("api/v1/repositories/lookup?url=#{CGI.escape(url)}")
+    return nil unless response.success?
+    
+    json = response.body
+    host = Host.find_by(name: json['host']['name'])
+    return nil unless host
+    
+    host.repositories.find_or_create_by(full_name: json['full_name'])
   end
 
   def to_s
@@ -130,7 +169,8 @@ class Repository < ApplicationRecord
   end
 
   def clone_repository(dir)
-    Rugged::Repository.clone_at(git_clone_url, dir)
+    output = `git clone --quiet #{git_clone_url.shellescape} #{dir.shellescape} 2>&1`
+    raise CloneError, "Failed to clone #{full_name}: #{output}" unless $?.success?
   end
 
   # TODO support hg and svn repos
@@ -158,9 +198,9 @@ class Repository < ApplicationRecord
       begin
         Dir.mktmpdir do |dir|
           begin
-            Timeout.timeout(60) { repo = clone_repository(dir) }
+            Timeout.timeout(60) { clone_repository(dir) }
           rescue Timeout::Error
-            raise "Clone timed out"
+            raise TimeoutError, "Clone timed out for #{full_name} after 60 seconds"
           end
           counts = count_commits_internal(dir)
           # commit_hashes = fetch_commits_internal(repo)
@@ -412,9 +452,90 @@ class Repository < ApplicationRecord
   def fetch_commits
     commits = []
     Dir.mktmpdir do |dir|
-      repo = clone_repository(dir)
-      commits = fetch_commits_internal(repo)
+      clone_repository(dir)
+      commits = fetch_commits_internal(dir)
     end
+    commits
+  end
+  
+  def fetch_commits_in_batches(&block)
+    Dir.mktmpdir do |dir|
+      clone_repository(dir)
+      
+      offset = 0
+      batch_size = 5000
+      
+      loop do
+        batch = fetch_commits_batch(dir, offset, batch_size)
+        break if batch.empty?
+        
+        yield batch
+        offset += batch_size
+        
+        # Stop if we got less than batch_size (end of commits)
+        break if batch.size < batch_size
+      end
+    end
+  end
+  
+  def fetch_commits_batch(dir, offset, limit)
+    head_check = `git -C #{dir.shellescape} rev-parse HEAD 2>/dev/null`.strip
+    return [] if head_check.empty?
+    
+    format = "%H|%s|%aI|%an|%ae|%cn|%ce|%P"
+    
+    git_cmd = ["git", "-C", dir, "log", "--format=#{format}", "--numstat", "-z", 
+               "--skip=#{offset}", "-n", limit.to_s]
+    
+    if last_synced_commit && total_commits && total_commits > 0
+      git_cmd << "#{last_synced_commit}..HEAD"
+    else
+      git_cmd << "HEAD"
+    end
+    
+    output = `#{git_cmd.shelljoin} 2>/dev/null`
+    
+    commits = []
+    repo_id = id
+    
+    output.split("\0").each do |commit_block|
+      next if commit_block.empty?
+      
+      lines = commit_block.lines
+      next if lines.empty?
+      
+      header = lines.shift
+      parts = header.split('|', 8)
+      next unless parts.length == 8
+      
+      sha, message, timestamp, author_name, author_email, committer_name, committer_email, parents = parts
+      
+      additions = 0
+      deletions = 0  
+      files = 0
+      
+      lines.each do |line|
+        if match = line.match(/^(\d+|-)\t(\d+|-)\t/)
+          add = match[1] == '-' ? 0 : match[1].to_i
+          del = match[2] == '-' ? 0 : match[2].to_i
+          additions += add
+          deletions += del
+          files += 1
+        end
+      end
+      
+      commits << {
+        repository_id: repo_id,
+        sha: sha,
+        message: message.strip,
+        timestamp: timestamp,
+        merge: parents.include?(' '),
+        author: "#{author_name} <#{author_email}>",
+        committer: "#{committer_name} <#{committer_email}>",
+        stats: [additions, deletions, files]
+      }
+    end
+    
     commits
   end
 
@@ -422,26 +543,67 @@ class Repository < ApplicationRecord
     commits.count
   end
 
-  def fetch_commits_internal(repo)
+  def fetch_commits_internal(dir)
+    head_check = `git -C #{dir.shellescape} rev-parse HEAD 2>/dev/null`.strip
+    return [] if head_check.empty?
+    
+    # Use a more efficient format with delimiter
+    format = "%H|%s|%aI|%an|%ae|%cn|%ce|%P"
+    
+    git_cmd = ["git", "-C", dir, "log", "--format=#{format}", "--numstat", "-z", "-n", "5000"]
+    
+    if last_synced_commit && total_commits && total_commits > 0
+      git_cmd << "#{last_synced_commit}..HEAD"
+    else
+      git_cmd << "HEAD"
+    end
+    
+    output = `#{git_cmd.shelljoin} 2>/dev/null`
+    
     commits = []
-    walker = Rugged::Walker.new(repo)
-    walker.hide(repo.lookup(last_synced_commit)) if last_synced_commit && commits_count > 0
-    walker.sorting(Rugged::SORT_DATE)
-    walker.push(repo.head.target)
-    walker.each do |commit|
+    repo_id = id # Cache to avoid repeated method calls
+    
+    # Split on null character for more reliable parsing
+    output.split("\0").each do |commit_block|
+      next if commit_block.empty?
+      
+      lines = commit_block.lines
+      next if lines.empty?
+      
+      # Parse header line efficiently
+      header = lines.shift
+      parts = header.split('|', 8)
+      next unless parts.length == 8
+      
+      sha, message, timestamp, author_name, author_email, committer_name, committer_email, parents = parts
+      
+      # Calculate stats efficiently
+      additions = 0
+      deletions = 0  
+      files = 0
+      
+      lines.each do |line|
+        if match = line.match(/^(\d+|-)\t(\d+|-)\t/)
+          add = match[1] == '-' ? 0 : match[1].to_i
+          del = match[2] == '-' ? 0 : match[2].to_i
+          additions += add
+          deletions += del
+          files += 1
+        end
+      end
+      
       commits << {
-        repository_id: id,
-        sha: commit.oid,
-        message: commit.message.strip,
-        timestamp: commit.time.iso8601,
-        merge: commit.parents.length > 1,
-        author: "#{commit.author[:name]} <#{commit.author[:email]}>",
-        committer: "#{commit.committer[:name]} <#{commit.committer[:email]}>",
-        stats: commit.diff.stat
+        repository_id: repo_id,
+        sha: sha,
+        message: message.strip,
+        timestamp: timestamp,
+        merge: parents.include?(' '),
+        author: "#{author_name} <#{author_email}>",
+        committer: "#{committer_name} <#{committer_email}>",
+        stats: [additions, deletions, files]
       }
     end
-    walker.reset
-    repo.close
+    
     commits
   end
 
@@ -449,13 +611,63 @@ class Repository < ApplicationRecord
     Timeout.timeout(900) do
       commit_hashes = fetch_commits
       return if commit_hashes.empty?
-      Commit.upsert_all(commit_hashes)
+      
+      # Batch insert for better performance
+      commit_hashes.each_slice(1000) do |batch|
+        Commit.upsert_all(batch, returning: false)
+      end
+      
+      # Update last synced commit
+      if commit_hashes.any?
+        update_column(:last_synced_commit, commit_hashes.first[:sha])
+      end
     end
-  rescue Timeout::Error
+  rescue Timeout::Error => e
     Rails.logger.error "Sync commits timeout for #{full_name} after 15 minutes"
-    raise
+    raise TimeoutError, "Sync commits timed out for #{full_name} after 15 minutes"
   rescue => e
-    puts "Error syncing commits for #{full_name}: #{e}"
+    Rails.logger.error "Error syncing commits for #{full_name}: #{e.message}"
+    raise SyncError, "Failed to sync commits for #{full_name}: #{e.message}"
+  end
+  
+  def sync_commits_streaming
+    Timeout.timeout(900) do
+      latest_sha = nil
+      total_processed = 0
+      
+      fetch_commits_in_batches do |batch|
+        next if batch.empty?
+        
+        # Track the latest commit SHA from first batch
+        latest_sha ||= batch.first[:sha]
+        
+        # Efficient bulk insert with conflict resolution
+        Commit.upsert_all(
+          batch,
+          returning: false,
+          record_timestamps: false
+        )
+        
+        total_processed += batch.size
+        Rails.logger.info "Processed #{total_processed} commits for #{full_name}"
+      end
+      
+      # Update last synced commit
+      if latest_sha
+        update_columns(
+          last_synced_commit: latest_sha,
+          last_synced_at: Time.current
+        )
+      end
+      
+      total_processed
+    end
+  rescue Timeout::Error => e
+    Rails.logger.error "Sync commits streaming timeout for #{full_name} after 15 minutes"
+    raise TimeoutError, "Sync commits streaming timed out for #{full_name} after 15 minutes"
+  rescue => e
+    Rails.logger.error "Error in streaming sync for #{full_name}: #{e.message}"
+    raise SyncError, "Failed to sync commits (streaming) for #{full_name}: #{e.message}"
   end
 
   def committer_records

@@ -77,12 +77,20 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
     @host = find_host_with_redirect(params[:host_id])
     return if performed?
     
-    @repository = @host.repositories.find_by!('lower(full_name) = ?', params[:id].downcase)
-    if @repository
-      @repository.sync_async
-    else
-      @host.sync_repository_async(path, request.remote_ip)
+    @repository = Repository.find_or_create_from_host(@host, params[:id])
+    
+    # Skip if recently synced
+    if @repository.last_synced_at.blank? || @repository.last_synced_at < 1.week.ago
+      job = Job.create!(
+        url: @repository.html_url || "https://#{@host.name}/#{@repository.full_name}",
+        status: 'pending',
+        ip: request.remote_ip
+      )
+      
+      sidekiq_id = ParseCommitsWorker.perform_async(job.id)
+      job.update(sidekiq_id: sidekiq_id)
     end
+    
     render json: { message: 'pong' }
   end
 
