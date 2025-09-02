@@ -168,11 +168,31 @@ class Repository < ApplicationRecord
     `git ls-remote #{git_clone_url} #{default_branch}`.split("\t").first
   end
 
+  def git_dir_args(dir)
+    # Validate directory path to prevent directory traversal
+    raise ArgumentError, "Invalid directory path" unless dir && File.directory?(dir)
+    
+    # Check if it's a bare repository (bare repos have HEAD file directly in the dir)
+    # Non-bare repos have .git directory
+    if File.exist?(File.join(dir, "HEAD"))
+      ["--git-dir", dir]  # Separate arguments are safer than interpolation
+    else
+      ["-C", dir]
+    end
+  end
+  
+  def git_dir_arg(dir)
+    # For backward compatibility with string interpolation
+    git_dir_args(dir).join(" ")
+  end
+  
   def clone_repository(dir)
+    # Use --bare to create a bare repository (no working directory needed)
     # Use --filter=blob:none to skip file contents (we only need commit history)
-    # Use --no-checkout to avoid creating working files
+    # Use --single-branch to only fetch the default branch (not all branches)
     # This significantly speeds up cloning large repositories
-    output = `git clone --filter=blob:none --no-checkout --quiet #{git_clone_url.shellescape} #{dir.shellescape} 2>&1`
+    branch_args = default_branch.present? ? "--branch #{default_branch.shellescape}" : ""
+    output = `git clone --bare --filter=blob:none --single-branch #{branch_args} --quiet #{git_clone_url.shellescape} #{dir.shellescape} 2>&1`
     unless $?.success?
       # Check if the repository has been deleted from GitHub
       if output.include?("could not read Username") || output.include?("Repository not found")
@@ -232,15 +252,15 @@ class Repository < ApplicationRecord
   end
 
   def count_commits_internal(dir)
-    last_commit = `git -C #{dir} rev-parse HEAD`.strip
-    output = `git -C #{dir} shortlog -s -n -e --no-merges HEAD`
+    last_commit = `git #{git_dir_arg(dir)} rev-parse HEAD`.strip
+    output = `git #{git_dir_arg(dir)} shortlog -s -n -e --no-merges HEAD`
     # Force UTF-8 encoding and replace invalid characters
     output = output.force_encoding('UTF-8')
     unless output.valid_encoding?
       output = output.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
     end
 
-    past_year_output = `git -C #{dir} shortlog -s -n -e --no-merges --since="1 year ago" HEAD`
+    past_year_output = `git #{git_dir_arg(dir)} shortlog -s -n -e --no-merges --since="1 year ago" HEAD`
     # Force UTF-8 encoding and replace invalid characters
     past_year_output = past_year_output.force_encoding('UTF-8')
     unless past_year_output.valid_encoding?
@@ -503,12 +523,12 @@ class Repository < ApplicationRecord
   end
   
   def fetch_commits_batch(dir, offset, limit)
-    head_check = `git -C #{dir.shellescape} rev-parse HEAD 2>/dev/null`.strip
+    head_check = `git #{git_dir_arg(dir.shellescape)} rev-parse HEAD 2>/dev/null`.strip
     return [] if head_check.empty?
     
     format = "%H|%s|%aI|%an|%ae|%cn|%ce|%P"
     
-    git_cmd = ["git", "-C", dir, "log", "--format=#{format}", "--numstat", "-z", 
+    git_cmd = ["git"] + git_dir_args(dir) + ["log", "--format=#{format}", "--numstat", "-z", 
                "--skip=#{offset}", "-n", limit.to_s]
     
     if last_synced_commit && total_commits && total_commits > 0
@@ -517,7 +537,8 @@ class Repository < ApplicationRecord
       git_cmd << "HEAD"
     end
     
-    output = `#{git_cmd.shelljoin} 2>/dev/null`
+    require 'open3'
+    output, _stderr, _status = Open3.capture3(*git_cmd)
     # Force UTF-8 encoding and replace invalid characters
     output = output.force_encoding('UTF-8')
     unless output.valid_encoding?
@@ -573,13 +594,13 @@ class Repository < ApplicationRecord
   end
 
   def fetch_commits_internal(dir)
-    head_check = `git -C #{dir.shellescape} rev-parse HEAD 2>/dev/null`.strip
+    head_check = `git #{git_dir_arg(dir.shellescape)} rev-parse HEAD 2>/dev/null`.strip
     return [] if head_check.empty?
     
     # Use a more efficient format with delimiter
     format = "%H|%s|%aI|%an|%ae|%cn|%ce|%P"
     
-    git_cmd = ["git", "-C", dir, "log", "--format=#{format}", "--numstat", "-z", "-n", "5000"]
+    git_cmd = ["git"] + git_dir_args(dir) + ["log", "--format=#{format}", "--numstat", "-z", "-n", "5000"]
     
     if last_synced_commit && total_commits && total_commits > 0
       git_cmd << "#{last_synced_commit}..HEAD"
@@ -587,7 +608,8 @@ class Repository < ApplicationRecord
       git_cmd << "HEAD"
     end
     
-    output = `#{git_cmd.shelljoin} 2>/dev/null`
+    require 'open3'
+    output, _stderr, _status = Open3.capture3(*git_cmd)
     # Force UTF-8 encoding and replace invalid characters
     output = output.force_encoding('UTF-8')
     unless output.valid_encoding?
@@ -752,7 +774,7 @@ class Repository < ApplicationRecord
           # Save progress if we processed any commits  
           if total_processed > 0
             # Get the current HEAD to mark where we got to
-            head_sha = `cd #{dir} && git rev-parse HEAD 2>/dev/null`.strip
+            head_sha = `git #{git_dir_arg(dir)} rev-parse HEAD 2>/dev/null`.strip
             if head_sha.present?
               update_columns(
                 last_synced_commit: head_sha,
@@ -808,7 +830,7 @@ class Repository < ApplicationRecord
       end
       
       # Get HEAD commit SHA since we processed from oldest to newest
-      head_sha = `cd #{dir} && git rev-parse HEAD 2>/dev/null`.strip
+      head_sha = `git #{git_dir_arg(dir)} rev-parse HEAD 2>/dev/null`.strip
       
       # Update tracking info with HEAD
       if head_sha.present?
@@ -828,7 +850,7 @@ class Repository < ApplicationRecord
   
   def get_oldest_commit_date(dir)
     # Use head -1 instead of -n 1 because --reverse with -n 1 doesn't work properly
-    output = `git -C #{dir.shellescape} log --reverse --format=%aI 2>&1 | head -1`.strip
+    output = `git #{git_dir_arg(dir.shellescape)} log --reverse --format=%aI 2>&1 | head -1`.strip
     
     if output.empty? || output.include?("fatal:")
       Rails.logger.error "Failed to get oldest commit date for #{full_name}: #{output}"
@@ -842,7 +864,7 @@ class Repository < ApplicationRecord
   end
   
   def get_newest_commit_date(dir)
-    output = `git -C #{dir.shellescape} log --format=%aI -n 1 2>&1`.strip
+    output = `git #{git_dir_arg(dir.shellescape)} log --format=%aI -n 1 2>&1`.strip
     
     if $?.exitstatus != 0
       Rails.logger.error "Failed to get newest commit date for #{full_name}: #{output}"
@@ -859,9 +881,9 @@ class Repository < ApplicationRecord
   def fetch_commits_by_date_range(dir, since_date, until_date)
     format = "%H|%s|%aI|%an|%ae|%cn|%ce|%P"
     
-    # Use ISO8601 format for date handling (git understands this better)
-    git_cmd = [
-      "git", "-C", dir, "log",
+    # Build command as array for safety (no shell interpolation)
+    git_cmd = ["git"] + git_dir_args(dir) + [
+      "log",
       "--format=#{format}",
       "--numstat", "-z",
       "--since=#{since_date.iso8601}",
@@ -869,10 +891,12 @@ class Repository < ApplicationRecord
       "--all"  # Search all branches, not just HEAD
     ]
     
-    output = `#{git_cmd.shelljoin} 2>&1`
+    # Use Open3 for safer process execution
+    require 'open3'
+    output, stderr, status = Open3.capture3(*git_cmd)
     
     # Log if there's an error
-    if $?.exitstatus != 0
+    if status.exitstatus != 0
       Rails.logger.error "Git log failed for #{since_date} to #{until_date}: #{output}"
       return []
     end

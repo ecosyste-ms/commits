@@ -185,8 +185,8 @@ class RepositoryTest < ActiveSupport::TestCase
     ]
     @repository.stubs(:fetch_commits_by_date_range).returns(commits_batch, [], [])
     
-    # Stub the git rev-parse HEAD command
-    @repository.stubs(:`).with { |cmd| cmd.include?("git rev-parse HEAD") }.returns("abc123\n")
+    # Stub the git rev-parse HEAD command (matches both -C and --git-dir formats)
+    @repository.stubs(:`).with { |cmd| cmd.include?("rev-parse HEAD") }.returns("abc123\n")
     
     result = @repository.sync_commits_incremental
     
@@ -279,8 +279,8 @@ class RepositoryTest < ActiveSupport::TestCase
     # Stub fetch_commits_by_date_range to return appropriate batches
     @repository.stubs(:fetch_commits_by_date_range).returns(batch4, batch3, batch2, batch1)
     
-    # Stub the git rev-parse HEAD command
-    @repository.stubs(:`).with { |cmd| cmd.include?("git rev-parse HEAD") }.returns("sha1\n")
+    # Stub the git rev-parse HEAD command (matches both -C and --git-dir formats)
+    @repository.stubs(:`).with { |cmd| cmd.include?("rev-parse HEAD") }.returns("sha1\n")
     
     # Stub Commit.upsert_all
     Commit.stubs(:upsert_all)
@@ -315,7 +315,7 @@ class RepositoryTest < ActiveSupport::TestCase
     Time.stubs(:now).returns(current_time, current_time + 6.minutes)
     
     # Stub the git rev-parse HEAD command (called when timeout occurs)
-    @repository.stubs(:`).with { |cmd| cmd.include?("git rev-parse HEAD") }.returns("sha1\n")
+    @repository.stubs(:`).with { |cmd| cmd.include?("rev-parse HEAD") }.returns("sha1\n")
     
     # Stub Commit.upsert_all to avoid database operations
     Commit.stubs(:upsert_all)
