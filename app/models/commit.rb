@@ -30,4 +30,26 @@ class Commit < ApplicationRecord
   def html_url
     "#{repository.html_url}/commit/#{sha}"
   end
+
+  def co_authors
+    return [] if message.blank?
+    
+    message.scan(/Co-authored-by:\s*(.+?)\s*<(.+?)>/i).map do |name, email|
+      {
+        name: name.strip,
+        email: email.strip
+      }
+    end
+  end
+
+  def signed_off_by
+    return [] if message.blank?
+    
+    message.scan(/Signed-off-by:\s*(.+?)\s*<(.+?)>/i).map do |name, email|
+      {
+        name: name.strip,
+        email: email.strip
+      }
+    end
+  end
 end
