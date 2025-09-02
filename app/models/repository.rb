@@ -446,9 +446,14 @@ class Repository < ApplicationRecord
   end
 
   def sync_commits
-    commit_hashes = fetch_commits
-    return if commit_hashes.empty?
-    Commit.upsert_all(commit_hashes) 
+    Timeout.timeout(900) do
+      commit_hashes = fetch_commits
+      return if commit_hashes.empty?
+      Commit.upsert_all(commit_hashes)
+    end
+  rescue Timeout::Error
+    Rails.logger.error "Sync commits timeout for #{full_name} after 15 minutes"
+    raise
   rescue => e
     puts "Error syncing commits for #{full_name}: #{e}"
   end

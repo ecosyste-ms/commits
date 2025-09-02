@@ -38,8 +38,13 @@ class Job < ApplicationRecord
 
   def perform_commit_parsing
     begin
-      results = parse_commits
-      update!(results: results, status: 'complete')      
+      Timeout.timeout(900) do
+        results = parse_commits
+        update!(results: results, status: 'complete')
+      end
+    rescue Timeout::Error => e
+      Rails.logger.error "Job #{id} timeout after 15 minutes for URL: #{url}"
+      update(results: {error: "Timeout after 15 minutes"}, status: 'error')
     rescue => e
       update(results: {error: e.inspect}, status: 'error')
     end
