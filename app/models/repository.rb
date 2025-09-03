@@ -187,12 +187,11 @@ class Repository < ApplicationRecord
   end
   
   def clone_repository(dir)
-    # Use --bare to create a bare repository (no working directory needed)
+    # Clone into a subdirectory to keep the structure clean
+    repo_path = File.join(dir, "repo")
     # Use --filter=blob:none to skip file contents (we only need commit history)
-    # Use --single-branch to only fetch the default branch (not all branches)
-    # This significantly speeds up cloning large repositories
-    branch_args = default_branch.present? ? "--branch #{default_branch.shellescape}" : ""
-    output = `git clone --bare --filter=blob:none --single-branch #{branch_args} --quiet #{git_clone_url.shellescape} #{dir.shellescape} 2>&1`
+    # Use --single-branch since we only fetch commits from HEAD anyway
+    output = `git clone --filter=blob:none --single-branch --quiet #{git_clone_url.shellescape} #{repo_path.shellescape} 2>&1`
     unless $?.success?
       # Check if the repository has been deleted from GitHub
       if output.include?("could not read Username") || output.include?("Repository not found")
@@ -497,7 +496,8 @@ class Repository < ApplicationRecord
     commits = []
     Dir.mktmpdir do |dir|
       clone_repository(dir)
-      commits = fetch_commits_internal(dir)
+      repo_dir = File.join(dir, "repo")
+      commits = fetch_commits_internal(repo_dir)
     end
     commits
   end
@@ -505,12 +505,13 @@ class Repository < ApplicationRecord
   def fetch_commits_in_batches(&block)
     Dir.mktmpdir do |dir|
       clone_repository(dir)
+      repo_dir = File.join(dir, "repo")
       
       offset = 0
       batch_size = 5000
       
       loop do
-        batch = fetch_commits_batch(dir, offset, batch_size)
+        batch = fetch_commits_batch(repo_dir, offset, batch_size)
         break if batch.empty?
         
         yield batch
@@ -728,11 +729,19 @@ class Repository < ApplicationRecord
     total_processed = 0
     
     Dir.mktmpdir do |dir|
+      # Benchmark: Clone repository
+      clone_start = Time.now
       clone_repository(dir)
+      repo_dir = File.join(dir, "repo")
+      clone_duration = Time.now - clone_start
+      Rails.logger.info "[BENCHMARK] Clone repository #{full_name}: #{clone_duration.round(2)}s"
       
-      # Get the date range for commits in the repository
-      oldest_commit_date = get_oldest_commit_date(dir)
-      newest_commit_date = get_newest_commit_date(dir)
+      # Benchmark: Get date range
+      date_range_start = Time.now
+      oldest_commit_date = get_oldest_commit_date(repo_dir)
+      newest_commit_date = get_newest_commit_date(repo_dir)
+      date_range_duration = Time.now - date_range_start
+      Rails.logger.info "[BENCHMARK] Get date range: #{date_range_duration.round(2)}s"
       
       Rails.logger.info "Incremental sync for #{full_name}: repo oldest=#{oldest_commit_date}, newest=#{newest_commit_date}"
       
@@ -741,111 +750,131 @@ class Repository < ApplicationRecord
         return nil
       end
       
+      # Count total commits in the repository (FAST!)
+      count_start = Time.now
+      total_repo_commits = count_commits_in_repo(repo_dir)
+      count_duration = Time.now - count_start
+      Rails.logger.info "[BENCHMARK] Count commits in repo: #{count_duration.round(2)}s"
+      Rails.logger.info "Repository has #{total_repo_commits} total commits"
+      
+      if total_repo_commits > 100000
+        Rails.logger.warn "WARNING: Very large repository with #{total_repo_commits} commits!"
+        Rails.logger.warn "Consider using a different sync strategy or increasing timeout"
+      elsif total_repo_commits > 50000
+        Rails.logger.warn "WARNING: Large repository with #{total_repo_commits} commits - sync may take a while"
+      end
+      
+      # Adjust batch size based on repo size
+      batch_size = if total_repo_commits > 100000
+        10000  # Larger batches for huge repos
+      elsif total_repo_commits > 50000
+        5000
+      else
+        2000  # Smaller batches for normal repos
+      end
+      Rails.logger.info "Using batch size: #{batch_size}"
+      
       # Check what we already have in the database
       existing_count = commits.count
       
-      if existing_count > 0
-        oldest_synced = commits.minimum(:timestamp)
-        newest_synced = commits.maximum(:timestamp)
-        Rails.logger.info "Found #{existing_count} existing commits from #{oldest_synced} to #{newest_synced}"
+      Rails.logger.info "Found #{existing_count} existing commits in database"
+      Rails.logger.info "Repository has #{total_repo_commits} total commits"
+      
+      # Quick check: if we already have all commits, we're done
+      if existing_count >= total_repo_commits
+        Rails.logger.info "Already have all commits (#{existing_count} in DB, #{total_repo_commits} in repo)"
         
-        # If we have a good number of commits and they're recent, just get new ones
-        if existing_count > 1000 && newest_synced && newest_synced > 1.week.ago
-          Rails.logger.info "Many recent commits found, only syncing newer commits"
-          oldest_commit_date = newest_synced
-        else
-          Rails.logger.info "Doing full sync to ensure completeness"
-          # Keep the original oldest_commit_date to sync everything
+        # Just update the last_synced_commit to current HEAD
+        head_sha = `git #{git_dir_arg(repo_dir)} rev-parse HEAD`.strip
+        if head_sha.present?
+          update_columns(
+            last_synced_commit: head_sha,
+            last_synced_at: Time.current
+          )
         end
-      else
-        Rails.logger.info "No existing commits found, starting fresh sync"
+        return existing_count
       end
       
-      # Process commits in monthly batches, from oldest to newest
-      # This ensures we build history chronologically
-      # Add a day buffer to ensure we catch commits on the exact dates
-      current_date = oldest_commit_date - 1.day
+      Rails.logger.info "Need to sync commits (have #{existing_count}, repo has #{total_repo_commits})"
       
-      while current_date <= newest_commit_date
-        # Check for timeout
-        if Time.now - start_time > timeout_duration
-          Rails.logger.warn "Incremental sync timeout for #{full_name} after processing #{total_processed} commits"
-          
-          # Save progress if we processed any commits  
-          if total_processed > 0
-            # Get the current HEAD to mark where we got to
-            head_sha = `git #{git_dir_arg(dir)} rev-parse HEAD 2>/dev/null`.strip
-            if head_sha.present?
-              update_columns(
-                last_synced_commit: head_sha,
-                last_synced_at: Time.current
-              )
-            end
+      # Process commits in batches using --skip and -n (FAST!)
+      # The database upsert will handle duplicates automatically
+      Rails.logger.info "Fetching commits for #{full_name} in batches"
+      
+      # batch_size is already set above based on repo size
+      offset = 0  # Always start from 0 to get newest commits first
+      
+      loop do
+        # Fetch a batch of commits
+        fetch_start = Time.now
+        batch = fetch_commits_paginated(repo_dir, offset, batch_size, last_synced_commit)
+        fetch_duration = Time.now - fetch_start
+        
+        break if batch.empty?
+        
+        Rails.logger.info "[BENCHMARK] Fetched batch of #{batch.size} commits (offset #{offset}) in #{fetch_duration.round(2)}s"
+        
+        # Clean the batch
+        clean_start = Time.now
+        cleaned_batch = batch.map do |commit|
+          commit.transform_values do |value|
+            value.is_a?(String) ? value.gsub("\u0000", '') : value
           end
-          
-          return :timeout
         end
+        clean_duration = Time.now - clean_start
+        Rails.logger.info "[BENCHMARK] Cleaned #{batch.size} commits in #{clean_duration.round(3)}s"
         
-        # Define the date range for this batch (1 month)
-        since_date = current_date
-        until_date = current_date + 1.month
-        
-        # Make sure we don't go beyond the newest commit
-        until_date = [until_date, newest_commit_date + 1.day].min
-        
-        Rails.logger.info "Fetching commits from #{since_date} to #{until_date} for #{full_name}"
-        
-        # Fetch commits for this time period
-        batch = fetch_commits_by_date_range(dir, since_date, until_date)
-        
-        Rails.logger.info "Found #{batch.size} commits in this batch"
-        
-        if batch.any?
-          # Clean and insert batch
-          cleaned_batch = batch.map do |commit|
-            commit.transform_values do |value|
-              if value.is_a?(String)
-                value.gsub("\u0000", '')
-              else
-                value
-              end
-            end
-          end
-          
-          cleaned_batch.each_slice(1000) do |chunk|
-            # Use unique_by to handle duplicates properly
-            Commit.upsert_all(
-              chunk, 
-              unique_by: [:repository_id, :sha],
-              returning: false
-            )
-          end
-          
-          total_processed += batch.size
-          Rails.logger.info "Processed #{batch.size} commits from #{since_date.to_date} to #{until_date.to_date} for #{full_name}"
+        # Insert this batch
+        db_start = Time.now
+        cleaned_batch.each_slice(1000) do |chunk|
+          Commit.upsert_all(
+            chunk,
+            unique_by: [:repository_id, :sha],
+            returning: false
+          )
         end
+        db_duration = Time.now - db_start
+        Rails.logger.info "[BENCHMARK] Inserted #{batch.size} commits to DB in #{db_duration.round(2)}s"
         
-        # Move to the next month
-        current_date = until_date
+        total_processed += batch.size
+        offset += batch_size
+        
+        # Stop if we got less than batch_size (means we're at the end)
+        break if batch.size < batch_size
       end
       
-      # Get HEAD commit SHA since we processed from oldest to newest
-      head_sha = `git #{git_dir_arg(dir)} rev-parse HEAD 2>/dev/null`.strip
+      # Get the most recent commit we actually synced
+      # Don't use HEAD because we might not have synced all commits
+      last_synced = commits.order('timestamp DESC').first
       
-      # Update tracking info with HEAD
-      if head_sha.present?
+      # Update tracking info with the actual last synced commit
+      if last_synced
         update_columns(
-          last_synced_commit: head_sha,
+          last_synced_commit: last_synced.sha,
           last_synced_at: Time.current
         )
+        Rails.logger.info "Updated last_synced_commit to #{last_synced.sha}"
       end
       
+      total_duration = Time.now - start_time
+      Rails.logger.info "[BENCHMARK] Total sync time for #{full_name}: #{total_duration.round(2)}s for #{total_processed} commits"
+      Rails.logger.info "[BENCHMARK] Average: #{(total_duration / total_processed * 1000).round(2)}ms per commit" if total_processed > 0
       Rails.logger.info "Successfully synced #{total_processed} commits for #{full_name}"
       total_processed
     end
   rescue => e
     Rails.logger.error "Error in incremental sync for #{full_name}: #{e.message}"
     raise SyncError, "Failed to sync commits incrementally for #{full_name}: #{e.message}"
+  end
+  
+  def count_commits_in_repo(dir)
+    # Use rev-list --count which is VERY fast
+    git_cmd = ["git"] + git_dir_args(dir) + ["rev-list", "--count", "HEAD"]
+    output = `#{git_cmd.join(' ')}`.strip
+    output.to_i
+  rescue => e
+    Rails.logger.error "Failed to count commits: #{e.message}"
+    0
   end
   
   def get_oldest_commit_date(dir)
@@ -878,6 +907,166 @@ class Repository < ApplicationRecord
     nil
   end
   
+  def fetch_commits_paginated(dir, offset, limit, after_sha = nil)
+    method_start = Time.now
+    format = "%H|%s|%aI|%an|%ae|%cn|%ce|%P"
+    
+    # Build command with pagination
+    # Note: Don't use SHA..HEAD with pagination - it's slow!
+    # Don't use --all either - it's also slow with many branches
+    # Just get commits from the current branch (usually main/master)
+    build_start = Time.now
+    git_cmd = ["git"] + git_dir_args(dir) + [
+      "log",
+      "--format=#{format}",
+      # "--numstat", "-z",  # DISABLED: numstat is VERY slow!
+      "--skip=#{offset}",
+      "-n", limit.to_s,
+      "HEAD"  # Just the current branch
+    ]
+    Rails.logger.info "[DEBUG-TIMING] Command build: #{(Time.now - build_start).round(4)}s"
+    
+    Rails.logger.info "[DEBUG] Running git command: #{git_cmd.join(' ')}"
+    Rails.logger.info "[DEBUG] Directory: #{dir}"
+    Rails.logger.info "[DEBUG] Offset: #{offset}, Limit: #{limit}"
+    
+    git_start = Time.now
+    require 'open3'
+    output, stderr, status = Open3.capture3(*git_cmd)
+    git_duration = Time.now - git_start
+    
+    Rails.logger.info "[DEBUG-TIMING] Git command execution: #{git_duration.round(2)}s"
+    Rails.logger.info "[DEBUG] Output size: #{output.bytesize} bytes"
+    Rails.logger.info "[DEBUG] Exit status: #{status.exitstatus}"
+    Rails.logger.info "[DEBUG] Stderr: #{stderr}" if stderr && !stderr.empty?
+    
+    unless status.exitstatus == 0
+      Rails.logger.error "Git log failed: exit #{status.exitstatus}, stderr: #{stderr}"
+      return []
+    end
+    
+    # Parse the output
+    parse_start = Time.now
+    commits = parse_commit_output_simple(output)  # Use simple parser without numstat
+    parse_duration = Time.now - parse_start
+    
+    Rails.logger.info "[DEBUG-TIMING] Parse output: #{parse_duration.round(2)}s for #{commits.size} commits"
+    Rails.logger.info "[DEBUG-TIMING] Total method time: #{(Time.now - method_start).round(2)}s"
+    
+    commits
+  end
+  
+  def fetch_all_commits_fast(dir, after_sha = nil)
+    format = "%H|%s|%aI|%an|%ae|%cn|%ce|%P"
+    
+    # Build command - get ALL commits without date filtering
+    git_cmd = ["git"] + git_dir_args(dir) + [
+      "log",
+      "--format=#{format}",
+      "--numstat", "-z",
+      "--all"  # Get all branches
+    ]
+    
+    # If we have a last synced commit, only get newer ones
+    if after_sha && commits.exists?(sha: after_sha)
+      git_cmd << "#{after_sha}..HEAD"
+    end
+    
+    Rails.logger.info "[DEBUG] Running git command: #{git_cmd.join(' ')}"
+    
+    require 'open3'
+    output, _stderr, status = Open3.capture3(*git_cmd)
+    
+    unless status.exitstatus == 0
+      Rails.logger.error "Git log failed: exit #{status.exitstatus}"
+      return []
+    end
+    
+    # Parse the output
+    parse_commit_output(output)
+  end
+  
+  def parse_commit_output_simple(output)
+    # Simple parsing without numstat data
+    output = output.force_encoding('UTF-8')
+    unless output.valid_encoding?
+      output = output.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
+    end
+    
+    commits = []
+    repo_id = id
+    
+    output.each_line do |line|
+      parts = line.strip.split('|', 8)
+      next unless parts.length == 8
+      
+      sha, message, timestamp, author_name, author_email, committer_name, committer_email, parents = parts
+      
+      commits << {
+        repository_id: repo_id,
+        sha: sha,
+        message: message.strip.gsub("\u0000", ''),
+        timestamp: timestamp,
+        merge: parents.include?(' '),
+        author: "#{author_name} <#{author_email}>".gsub("\u0000", ''),
+        committer: "#{committer_name} <#{committer_email}>".gsub("\u0000", ''),
+        stats: [0, 0, 0]  # No stats without numstat
+      }
+    end
+    
+    commits
+  end
+  
+  def parse_commit_output(output)
+    output = output.force_encoding('UTF-8')
+    unless output.valid_encoding?
+      output = output.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
+    end
+    
+    commits = []
+    repo_id = id
+    
+    output.split("\0").each do |commit_block|
+      next if commit_block.empty?
+      
+      lines = commit_block.lines
+      next if lines.empty?
+      
+      header = lines.shift
+      parts = header.split('|', 8)
+      next unless parts.length == 8
+      
+      sha, message, timestamp, author_name, author_email, committer_name, committer_email, parents = parts
+      
+      additions = 0
+      deletions = 0  
+      files = 0
+      
+      lines.each do |line|
+        if match = line.match(/^(\d+|-)\t(\d+|-)\t/)
+          add = match[1] == '-' ? 0 : match[1].to_i
+          del = match[2] == '-' ? 0 : match[2].to_i
+          additions += add
+          deletions += del
+          files += 1
+        end
+      end
+      
+      commits << {
+        repository_id: repo_id,
+        sha: sha,
+        message: message.strip.gsub("\u0000", ''),
+        timestamp: timestamp,
+        merge: parents.include?(' '),
+        author: "#{author_name} <#{author_email}>".gsub("\u0000", ''),
+        committer: "#{committer_name} <#{committer_email}>".gsub("\u0000", ''),
+        stats: [files, additions, deletions]
+      }
+    end
+    
+    commits
+  end
+  
   def fetch_commits_by_date_range(dir, since_date, until_date)
     format = "%H|%s|%aI|%an|%ae|%cn|%ce|%P"
     
@@ -891,9 +1080,13 @@ class Repository < ApplicationRecord
       "--all"  # Search all branches, not just HEAD
     ]
     
-    # Use Open3 for safer process execution
+    # Benchmark: Git command execution
+    git_start = Time.now
+    Rails.logger.info "[DEBUG] Running git command: #{git_cmd.inspect}"
     require 'open3'
-    output, stderr, status = Open3.capture3(*git_cmd)
+    output, _stderr, status = Open3.capture3(*git_cmd)
+    git_duration = Time.now - git_start
+    Rails.logger.info "[BENCHMARK] Git log command (#{since_date.to_date} to #{until_date.to_date}): #{git_duration.round(3)}s, output size: #{output.bytesize} bytes"
     
     # Log if there's an error
     if status.exitstatus != 0
