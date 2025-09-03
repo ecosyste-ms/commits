@@ -22,7 +22,7 @@ class CommitsControllerTest < ActionDispatch::IntegrationTest
     empty_repo = create(:repository, host: @host, full_name: "test/empty")
     get host_repository_commits_url(@host, empty_repo)
     assert_response :success
-    assert_select "p.text-muted", text: /No commits found/
+    assert_select "p.text-muted", text: /No commits imported for this repository yet/
   end
 
   test "should paginate commits" do

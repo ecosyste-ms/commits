@@ -54,7 +54,7 @@ class Job < ApplicationRecord
     repo = Repository.find_or_create_from_url(url)
     return nil unless repo
     
-    repo.count_commits
+    repo.sync_all
     repo.as_json
   end
 end

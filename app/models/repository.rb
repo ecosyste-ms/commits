@@ -216,37 +216,80 @@ class Repository < ApplicationRecord
     count_refs > 1000 || (size.present? && size > 500_000)
   end
 
+  def sync_all
+    sync_details
+    return if too_large?
+    return if status == 'not_found'
+    
+    last_commit = fetch_head_sha
+    if !past_year_committers.nil? && last_synced_commit == last_commit && commits_count > 0
+      update(last_synced_at: Time.now)
+      return
+    end
+    
+    begin
+      Dir.mktmpdir do |dir|
+        # Clone repository once
+        begin
+          Timeout.timeout(60) { clone_repository(dir) }
+        rescue Timeout::Error
+          raise TimeoutError, "Clone timed out for #{full_name} after 60 seconds"
+        end
+        
+        repo_dir = File.join(dir, "repo")
+        
+        # Count commits and update statistics
+        counts = count_commits_internal(dir)
+        update(counts)
+        
+        # Sync commit data incrementally 
+        sync_commits_from_dir(repo_dir)
+        
+        # Handle committers
+        if committers
+          fetch_all_logins
+          create_committer_join_records
+        end
+        
+        update(last_synced_at: Time.now)
+      end
+    rescue => e
+      self.status = 'too_large' if e.message.include?('timed out') || e.message.include?('too many committers')
+      self.save
+      puts "Error syncing repository #{full_name}: #{e}"
+    end
+  end
+
   def count_commits
     sync_details
     return if too_large?
     return if status == 'not_found'
+    
     last_commit = fetch_head_sha
-
     if !past_year_committers.nil? && last_synced_commit == last_commit && commits_count > 0
       update(last_synced_at: Time.now)
-    else
-      begin
-        Dir.mktmpdir do |dir|
-          begin
-            Timeout.timeout(60) { clone_repository(dir) }
-          rescue Timeout::Error
-            raise TimeoutError, "Clone timed out for #{full_name} after 60 seconds"
-          end
-          counts = count_commits_internal(dir)
-          # commit_hashes = fetch_commits_internal(repo)
-          # Commit.upsert_all(commit_hashes) unless commit_hashes.empty?
-          update(counts)
-
-          if committers
-            fetch_all_logins
-            create_committer_join_records
-          end
+      return
+    end
+    
+    begin
+      Dir.mktmpdir do |dir|
+        begin
+          Timeout.timeout(60) { clone_repository(dir) }
+        rescue Timeout::Error
+          raise TimeoutError, "Clone timed out for #{full_name} after 60 seconds"
         end
-      rescue => e
-        self.status = 'too_large' if e.message.include?('timed out') || e.message.include?('too many committers')
-        self.save
-        puts "Error counting commits for #{full_name}: #{e}"
+        counts = count_commits_internal(dir)
+        update(counts)
+
+        if committers
+          fetch_all_logins
+          create_committer_join_records
+        end
       end
+    rescue => e
+      self.status = 'too_large' if e.message.include?('timed out') || e.message.include?('too many committers')
+      self.save
+      puts "Error counting commits for #{full_name}: #{e}"
     end
   end
 
@@ -681,6 +724,82 @@ class Repository < ApplicationRecord
       result
     else
       sync_commits_regular
+    end
+  end
+  
+  def sync_commits_from_dir(repo_dir)
+    # Sync commits using already cloned repository directory
+    start_time = Time.now
+    timeout_duration = 300 # 5 minutes
+    total_processed = 0
+    
+    begin
+      # Get date range
+      oldest_commit_date = get_oldest_commit_date(repo_dir)
+      newest_commit_date = get_newest_commit_date(repo_dir)
+      
+      Rails.logger.info "Incremental sync for #{full_name}: repo oldest=#{oldest_commit_date}, newest=#{newest_commit_date}"
+      
+      return nil if oldest_commit_date.nil? || newest_commit_date.nil?
+      
+      # Count total commits in the repository
+      total_repo_commits = count_commits_in_repo(repo_dir)
+      Rails.logger.info "Repository has #{total_repo_commits} total commits"
+      
+      # Get existing commit count
+      existing_commits = commits.count
+      Rails.logger.info "Database has #{existing_commits} existing commits for this repo"
+      
+      if existing_commits >= total_repo_commits
+        Rails.logger.info "All commits already synced (#{existing_commits} >= #{total_repo_commits})"
+        return true
+      end
+      
+      # Process commits in date chunks
+      current_date = oldest_commit_date.to_date
+      end_date = newest_commit_date.to_date
+      
+      while current_date <= end_date && (Time.now - start_time) < timeout_duration
+        chunk_end = [current_date + 30.days, end_date].min
+        
+        batch = fetch_commits_for_date_range(repo_dir, current_date, chunk_end)
+        
+        if batch.any?
+          # Clean and insert batch
+          cleaned_batch = batch.map do |commit|
+            commit.transform_values do |value|
+              value.is_a?(String) ? value.gsub("\u0000", '') : value
+            end
+          end
+          
+          Commit.upsert_all(
+            cleaned_batch,
+            unique_by: [:repository_id, :sha],
+            returning: false,
+            record_timestamps: false
+          )
+          
+          total_processed += batch.size
+        end
+        
+        current_date = chunk_end + 1.day
+      end
+      
+      # Update last synced commit
+      latest_sha = `git -C #{repo_dir.shellescape} rev-parse HEAD`.strip
+      update_column(:last_synced_commit, latest_sha) if latest_sha.present?
+      
+      Rails.logger.info "Processed #{total_processed} commits in #{(Time.now - start_time).round(2)}s"
+      
+      if (Time.now - start_time) >= timeout_duration
+        Rails.logger.info "Sync timed out after processing #{total_processed} commits"
+        :timeout
+      else
+        true
+      end
+    rescue => e
+      Rails.logger.error "Error syncing commits from dir: #{e.message}"
+      raise
     end
   end
   

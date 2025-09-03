@@ -80,7 +80,7 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
     @repository = Repository.find_or_create_from_host(@host, params[:id])
     
     # Skip if recently synced
-    if @repository.last_synced_at.blank? || @repository.last_synced_at < 1.week.ago
+    if @repository.last_synced_at.blank? || @repository.last_synced_at < 1.day.ago
       job = Job.create!(
         url: @repository.html_url || "https://#{@host.name}/#{@repository.full_name}",
         status: 'pending',
@@ -94,14 +94,4 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
     render json: { message: 'pong' }
   end
 
-  def sync_commits
-    @host = find_host_with_redirect(params[:host_id])
-    return if performed?
-    
-    @repository = @host.repositories.find_by!('lower(full_name) = ?', params[:id].downcase)
-    
-    job_id = SyncCommitsDataWorker.perform_async(@repository.id, true)
-    
-    render json: { message: 'Sync commits job has been queued', job_id: job_id }, status: :accepted
-  end
 end
