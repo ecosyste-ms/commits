@@ -1,11 +1,11 @@
-openapi: 3.0.1
+openapi: 3.1.1
 info:
   title: "Ecosyste.ms: commits"
   description: "An open API service providing commit metadata for open source projects. "
   contact:
     name: Ecosyste.ms
     email: support@ecosyste.ms
-    url: https://ecosyste.ms 
+    url: https://ecosyste.ms
   version: 1.0.0
   license:
     name: CC-BY-SA-4.0
@@ -14,7 +14,7 @@ externalDocs:
   description: GitHub Repository
   url: https://github.com/ecosyste-ms/commits
 servers:
-- url: https://commits.ecosyste.ms/api/v1
+  - url: https://commits.ecosyste.ms/api/v1
 paths:
   /repositories/lookup:
     get:
@@ -33,7 +33,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Repository'
+                $ref: "#/components/schemas/Repository"
   /hosts:
     get:
       summary: list registies
@@ -41,13 +41,13 @@ paths:
       parameters:
         - name: page
           in: query
-          description: pagination page number 
+          description: pagination page number
           required: false
           schema:
             type: integer
         - name: per_page
           in: query
-          description: Number of records to return 
+          description: Number of records to return
           required: false
           schema:
             type: integer
@@ -59,7 +59,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Host'
+                  $ref: "#/components/schemas/Host"
   /hosts/{hostName}:
     get:
       summary: get a host by name
@@ -73,13 +73,13 @@ paths:
           description: name of host
         - name: page
           in: query
-          description: pagination page number 
+          description: pagination page number
           required: false
           schema:
             type: integer
         - name: per_page
           in: query
-          description: Number of records to return 
+          description: Number of records to return
           required: false
           schema:
             type: integer
@@ -89,7 +89,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Host'
+                $ref: "#/components/schemas/Host"
   /hosts/{hostName}/repositories:
     get:
       summary: get a list of repositories from a host
@@ -103,13 +103,13 @@ paths:
           description: name of host
         - name: page
           in: query
-          description: pagination page number 
+          description: pagination page number
           required: false
           schema:
             type: integer
         - name: per_page
           in: query
-          description: Number of records to return 
+          description: Number of records to return
           required: false
           schema:
             type: integer
@@ -147,7 +147,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Repository'
+                  $ref: "#/components/schemas/Repository"
   /hosts/{hostName}/repositories/{repoName}:
     get:
       summary: get a repository from a host
@@ -171,7 +171,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/Repository'
+                $ref: "#/components/schemas/Repository"
   /hosts/{hostName}/repositories/{repoName}/commits:
     get:
       summary: get a list of commits from a repository
@@ -191,13 +191,13 @@ paths:
           description: name of repository
         - name: page
           in: query
-          description: pagination page number 
+          description: pagination page number
           required: false
           schema:
             type: integer
         - name: per_page
           in: query
-          description: Number of records to return 
+          description: Number of records to return
           required: false
           schema:
             type: integer
@@ -235,7 +235,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/Commit'
+                  $ref: "#/components/schemas/Commit"
 components:
   schemas:
     Host:
@@ -332,13 +332,3 @@ components:
           type: boolean
         html_url:
           type: string
-        stats:
-          type: object
-          properties:
-            files_changed:
-              type: integer
-            additions:
-              type: integer
-            deletions:
-              type: integer
-            

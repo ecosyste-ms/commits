@@ -37,7 +37,7 @@
               <% if commit.co_authors.any? %>
                 <br>
                 <small class="text-muted">
-                  Co-authored-by: 
+                  Co-authored-by:
                   <% commit.co_authors.each_with_index do |co_author, index| %>
                     <%= co_author[:name] %> &lt;<%= obfusticate_email(co_author[:email]) %>&gt;<% if index < commit.co_authors.length - 1 %>, <% end %>
                   <% end %>
@@ -46,7 +46,7 @@
               <% if commit.signed_off_by.any? %>
                 <br>
                 <small class="text-muted">
-                  Signed-off-by: 
+                  Signed-off-by:
                   <% commit.signed_off_by.each_with_index do |signer, index| %>
                     <%= signer[:name] %> &lt;<%= obfusticate_email(signer[:email]) %>&gt;<% if index < commit.signed_off_by.length - 1 %>, <% end %>
                   <% end %>
@@ -64,7 +64,7 @@
                 <% if commit.committer && commit.committer != commit.author %>
                   <br>
                   <span class="text-muted">
-                    Committed by: 
+                    Committed by:
                     <% committer_parts = commit.committer.to_s.match(/^(.+?)\s*<(.+?)>$/) %>
                     <% if committer_parts %>
                       <%= committer_parts[1] %> &lt;<%= obfusticate_email(committer_parts[2]) %>&gt;
@@ -79,26 +79,19 @@
               <small><%= time_ago_in_words(commit.timestamp) %> ago</small>
             </td>
             <td>
-              <small>
-                <% if commit.files_changed > 0 %>
-                  <%= commit.files_changed %> files
-                  <span class="text-success">+<%= commit.additions %></span>
-                  <span class="text-danger">-<%= commit.deletions %></span>
-                <% end %>
-              </small>
             </td>
           </tr>
         <% end %>
       </tbody>
     </table>
-    
+
     <%== pagy_bootstrap_nav(@pagy) if @pagy.pages > 1 %>
   <% else %>
     <p class="text-muted">
       <i>No commits imported for this repository yet.</i>
     </p>
   <% end %>
-  
+
   <p>
     <%= link_to "← Back to repository", host_repository_path(@host, @repository), class: "btn btn-secondary btn-sm" %>
   </p>
