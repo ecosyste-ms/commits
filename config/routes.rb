@@ -33,7 +33,9 @@ Rails.application.routes.draw do
   get 'repositories/lookup', to: 'repositories#lookup', as: :lookup_repositories
 
   resources :hosts, constraints: { id: /.*/ }, only: [:index, :show], :defaults => {:format => :html} do
-    resources :repositories, constraints: { id: /.*/ }, only: [:index, :show]
+    resources :repositories, constraints: { id: /.*/ }, only: [:index, :show] do
+      resources :commits, only: [:index]
+    end
     resources :owners, constraints: { id: /.*/ }, only: [:index, :show]
     resources :committers, constraints: { id: /.*/ }, only: [:index, :show]
   end
