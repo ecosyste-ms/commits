@@ -223,7 +223,11 @@ class Repository < ApplicationRecord
   def sync_all(force: false)
     sync_details
     return if too_large?
-    return if status == 'not_found'
+    if status == 'not_found'
+      # Update last_synced_at even for not_found repos to avoid repeated attempts
+      update_column(:last_synced_at, Time.now)
+      return
+    end
     
     last_commit = fetch_head_sha
     
