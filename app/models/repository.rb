@@ -191,18 +191,30 @@ class Repository < ApplicationRecord
     repo_path = File.join(dir, "repo")
     # Use --filter=blob:none to skip file contents (we only need commit history)
     # Use --single-branch since we only fetch commits from HEAD anyway
+    
     # Prevent any credential prompts - fail immediately for private repos
-    output = `export GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/echo && git clone --filter=blob:none --single-branch --quiet #{git_clone_url.shellescape} #{repo_path.shellescape} 2>&1`
-    unless $?.success?
+    env = {
+      'GIT_TERMINAL_PROMPT' => '0',
+      'GIT_ASKPASS' => 'echo',
+      'SSH_ASKPASS' => 'echo'
+    }
+    
+    require 'open3'
+    cmd = ['git', 'clone', '--filter=blob:none', '--single-branch', '--quiet', git_clone_url, repo_path]
+    output, error, status = Open3.capture3(env, *cmd)
+    
+    unless status.success?
+      full_output = [output, error].compact.join("\n")
       # Check if the repository has been deleted from GitHub or is private
-      if output.include?("could not read Username") || 
-         output.include?("Repository not found") || 
-         output.include?("Authentication failed") ||
-         output.include?("terminal prompts disabled")
+      if full_output.include?("could not read Username") || 
+         full_output.include?("Repository not found") || 
+         full_output.include?("Authentication failed") ||
+         full_output.include?("terminal prompts disabled") ||
+         full_output.include?("Permission denied")
         update_column(:status, 'not_found')
         raise CloneError, "Repository #{full_name} appears to be deleted or private"
       end
-      raise CloneError, "Failed to clone #{full_name}: #{output}"
+      raise CloneError, "Failed to clone #{full_name}: #{full_output}"
     end
   end
 
@@ -268,13 +280,14 @@ class Repository < ApplicationRecord
           fetch_all_logins
           create_committer_join_records
         end
-        
-        update(last_synced_at: Time.now)
       end
     rescue => e
       self.status = 'too_large' if e.message.include?('timed out') || e.message.include?('too many committers')
       self.save
       puts "Error syncing repository #{full_name}: #{e}"
+    ensure
+      # Always update last_synced_at, even if sync failed or repo is too_large
+      update_column(:last_synced_at, Time.now) unless destroyed?
     end
   end
 
