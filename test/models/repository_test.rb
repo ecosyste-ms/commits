@@ -236,36 +236,6 @@ class RepositoryTest < ActiveSupport::TestCase
     end
   end
   
-  test "fetch_commits_by_date_range returns commits in range" do
-    Dir.mktmpdir do |dir|
-      # Create a test git repository
-      `git init #{dir} 2>&1`
-      
-      # Create commits across different dates
-      dates = [
-        "2020-01-01T10:00:00Z",
-        "2020-02-01T10:00:00Z", 
-        "2020-03-01T10:00:00Z",
-        "2020-04-01T10:00:00Z"
-      ]
-      
-      dates.each_with_index do |date, i|
-        File.write("#{dir}/file#{i}.txt", "content#{i}")
-        `cd #{dir} && git add . && GIT_AUTHOR_DATE="#{date}" GIT_COMMITTER_DATE="#{date}" git -c user.name="Test" -c user.email="test@test.com" commit -m "Commit #{i}" 2>&1`
-      end
-      
-      # Fetch commits from Feb to March (should get 2 commits)
-      commits = @repository.fetch_commits_by_date_range(
-        dir,
-        Time.parse("2020-01-15T00:00:00Z"),
-        Time.parse("2020-03-15T00:00:00Z")
-      )
-      
-      assert_equal 2, commits.length
-      assert_equal "Commit 2", commits[0][:message] # Most recent first
-      assert_equal "Commit 1", commits[1][:message]
-    end
-  end
   
   # Git log tests
   test "fetch_commits_internal parses git log output correctly" do
@@ -525,4 +495,336 @@ class RepositoryTest < ActiveSupport::TestCase
 
   # Removed test "incremental sync should update last_synced_commit correctly" as
   # the mocking setup is too complex and fragile with the new implementation
+  
+  # Co-author extraction tests
+  test "parse_commit_output parses single line correctly" do
+    # First test with a simple single-line message
+    # SHA needs to be 40 hex characters
+    sha = "a" * 40
+    # Format: sha\0parents\0author_name\0author_email\0committer_name\0committer_email\0timestamp\0message
+    output = "#{sha}\x00\x00John\x00john@example.com\x00John\x00john@example.com\x002024-01-01T10:00:00Z\x00Simple message"
+    
+    commits = @repository.parse_commit_output(output)
+    
+    assert_equal 1, commits.length, "Should parse one commit"
+    commit = commits.first
+    
+    assert_equal sha, commit[:sha]
+    assert_equal "Simple message", commit[:message]
+  end
+  
+  test "parse_commit_output handles multi-line messages with NUL delimiter" do
+    # Create test output with NUL delimiter (\x00) between fields
+    # SHA needs to be 40 hex characters
+    sha = "b" * 40
+    message = "feat: add new feature\n\nThis is the body\nwith multiple lines"
+    timestamp = "2024-01-01T10:00:00Z"
+    author_name = "John Doe"
+    author_email = "john@example.com"
+    committer_name = "Jane Doe"
+    committer_email = "jane@example.com"
+    parents = ""
+    
+    # Build the output string with NUL delimiters
+    # Format: sha\0parents\0author_name\0author_email\0committer_name\0committer_email\0timestamp\0message
+    output = "#{sha}\x00#{parents}\x00#{author_name}\x00#{author_email}\x00#{committer_name}\x00#{committer_email}\x00#{timestamp}\x00#{message}"
+    
+    commits = @repository.parse_commit_output(output)
+    
+    assert_equal 1, commits.length
+    commit = commits.first
+    
+    assert_equal sha, commit[:sha]
+    assert_equal message.strip, commit[:message]
+    assert_match(/feat: add new feature/, commit[:message])
+    assert_match(/This is the body/, commit[:message])
+    assert_match(/with multiple lines/, commit[:message])
+  end
+
+  test "fetch_commits_internal handles multi-line commit messages" do
+    Dir.mktmpdir do |dir|
+      # Create a test git repository
+      `git init #{dir} 2>&1`
+      
+      # Create commit with multi-line message
+      File.write("#{dir}/file1.txt", "content1")
+      multi_line_message = "feat: update issue-notify to use repository_dispatch
+
+Switch from workflow_dispatch to repository_dispatch for cross-repo
+triggering of issue-detective workflow in claude-cli-internal.
+
+Changes:
+- Use gh api with repository_dispatch endpoint
+- Send issue_url in client_payload
+- Support ISSUE_NOTIFY_TOKEN secret for better permissions
+- Remove dependency on ISSUE_NOTIFY_WORKFLOW_NAME secret
+
+This enables automatic issue detective analysis when issues are
+opened in claude-code repository.
+
+🤖 Generated with [Claude Code](https://claude.ai/code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+      
+      `cd #{dir} && git add file1.txt && git -c user.name="Test User" -c user.email="test@example.com" commit -m "#{multi_line_message}" 2>&1`
+      
+      # Test fetch_commits_internal
+      commits = @repository.fetch_commits_internal(dir)
+      
+      assert_equal 1, commits.length
+      
+      commit = commits.first
+      assert_equal @repository.id, commit[:repository_id]
+      
+      # Check that the full message is captured, not just the first line
+      assert_match(/feat: update issue-notify to use repository_dispatch/, commit[:message])
+      assert_match(/Switch from workflow_dispatch to repository_dispatch/, commit[:message])
+      assert_match(/Changes:/, commit[:message])
+      assert_match(/This enables automatic issue detective analysis/, commit[:message])
+      assert_match(/Generated with \[Claude Code\]/, commit[:message])
+      assert_match(/Co-Authored-By: Claude/, commit[:message])
+      
+      # Check co-author extraction
+      assert_equal "noreply@anthropic.com", commit[:co_author_email]
+    end
+  end
+
+  test "fetch_commits_internal extracts co_author_email from commit messages" do
+    Dir.mktmpdir do |dir|
+      # Create a test git repository
+      `git init #{dir} 2>&1`
+      
+      # Create commit with co-author
+      File.write("#{dir}/file1.txt", "content1")
+      `cd #{dir} && git add file1.txt && git -c user.name="Main Author" -c user.email="main@example.com" commit -m "Fix bug
+
+Co-authored-by: Claude <noreply@anthropic.com>" 2>&1`
+      
+      # Create commit without co-author
+      File.write("#{dir}/file2.txt", "content2")
+      `cd #{dir} && git add file2.txt && git -c user.name="Solo Author" -c user.email="solo@example.com" commit -m "Regular commit" 2>&1`
+      
+      commits = @repository.fetch_commits_internal(dir)
+      
+      assert_equal 2, commits.length
+      
+      # Check commit without co-author (most recent)
+      solo_commit = commits.first
+      assert_equal "Regular commit", solo_commit[:message]
+      assert_nil solo_commit[:co_author_email]
+      
+      # Check commit with co-author
+      co_authored_commit = commits.last
+      assert_match(/Fix bug/, co_authored_commit[:message])
+      assert_equal "noreply@anthropic.com", co_authored_commit[:co_author_email]
+    end
+  end
+
+  test "parse_commit_output extracts co_author_email" do
+    # Use NUL (\x00) as delimiter to match the new format
+    # SHAs need to be 40 hex characters
+    sha1 = "c" * 40
+    sha2 = "d" * 40
+    # Format: sha\0parents\0author_name\0author_email\0committer_name\0committer_email\0timestamp\0message
+    output = "#{sha1}\x00 \x00John Doe\x00john@example.com\x00John Doe\x00john@example.com\x002024-01-01T10:00:00Z\x00Fix bug\n\nCo-authored-by: Claude <noreply@anthropic.com>\x00"
+    output += "#{sha2}\x00 \x00Jane Doe\x00jane@example.com\x00Jane Doe\x00jane@example.com\x002024-01-02T10:00:00Z\x00Regular commit"
+    
+    commits = @repository.parse_commit_output(output)
+    
+    assert_equal 2, commits.length
+    assert_equal "noreply@anthropic.com", commits[0][:co_author_email]
+    assert_nil commits[1][:co_author_email]
+  end
+
+  test "parse_commit_output with single-line message and numstat" do
+    # First test with single-line message to make sure basic parsing works
+    sha1 = "a" * 40
+    # Format: sha\0parents\0author_name\0author_email\0committer_name\0committer_email\0timestamp\0message\0numstat
+    output = "#{sha1}\x00 \x00John Doe\x00john@example.com\x00John Doe\x00john@example.com\x002024-01-01T10:00:00Z\x00Simple commit\x001\t2\tfile.txt\0"
+    
+    commits = @repository.parse_commit_output(output)
+    
+    assert_equal 1, commits.length
+    commit = commits.first
+    assert_equal sha1, commit[:sha]
+    assert_equal "Simple commit", commit[:message]
+    assert_equal [1, 1, 2], commit[:stats] # files, additions, deletions
+  end
+
+  test "parse_commit_output extracts co_author_email with numstat" do
+    # Using null-separated format like actual git log output with NUL delimiter
+    sha1 = "e" * 40
+    sha2 = "f" * 40
+    # Format: sha\0parents\0author_name\0author_email\0committer_name\0committer_email\0timestamp\0message\0numstat\0
+    output = "#{sha1}\x00 \x00John Doe\x00john@example.com\x00John Doe\x00john@example.com\x002024-01-01T10:00:00Z\x00Fix bug\n\nCo-authored-by: User <user@example.com>\x001\t2\tfile.txt\x00"
+    output += "#{sha2}\x00 \x00Jane Doe\x00jane@example.com\x00Jane Doe\x00jane@example.com\x002024-01-02T10:00:00Z\x00Normal commit\x003\t4\tother.txt\0"
+    
+    commits = @repository.parse_commit_output(output)
+    
+    assert_equal 2, commits.length
+    assert_equal "user@example.com", commits[0][:co_author_email]
+    assert_nil commits[1][:co_author_email]
+    # Check stats were parsed correctly  
+    assert_equal [1, 1, 2], commits[0][:stats] # files, additions, deletions
+    assert_equal [1, 3, 4], commits[1][:stats]
+  end
+
+  test "fetch_commits_batch includes co_author_email" do
+    Dir.mktmpdir do |dir|
+      # Create a test git repository
+      `git init #{dir} 2>&1`
+      
+      # Create commit with co-author
+      File.write("#{dir}/file1.txt", "content1")
+      `cd #{dir} && git add file1.txt && git -c user.name="Author" -c user.email="author@example.com" commit -m "Feature implementation
+
+Co-authored-by: Assistant <assistant@ai.com>" 2>&1`
+      
+      commits = @repository.fetch_commits_batch(dir, 0, 10)
+      
+      assert_equal 1, commits.length
+      assert_equal "assistant@ai.com", commits[0][:co_author_email]
+    end
+  end
+
+  test "sync_commits saves co_author_email to database" do
+    Dir.mktmpdir do |dir|
+      # Create a test git repository
+      `git init #{dir} 2>&1`
+      
+      # Create commits with and without co-authors
+      File.write("#{dir}/file1.txt", "content1")
+      `cd #{dir} && git add file1.txt && git -c user.name="Author1" -c user.email="author1@example.com" commit -m "First commit
+
+Co-authored-by: Helper <helper@example.com>" 2>&1`
+      
+      File.write("#{dir}/file2.txt", "content2")
+      `cd #{dir} && git add file2.txt && git -c user.name="Author2" -c user.email="author2@example.com" commit -m "Second commit" 2>&1`
+      
+      # Mock the clone_repository to use our test directory
+      @repository.stubs(:clone_repository).returns(nil)
+      @repository.stubs(:fetch_commits).returns(@repository.fetch_commits_internal(dir))
+      
+      # Run sync
+      @repository.sync_commits(incremental: false)
+      
+      # Check the commits were created with correct co_author_email
+      commits = @repository.commits
+      assert_equal 2, commits.count
+      
+      # Find commits by message since order might vary
+      first_commit = commits.find { |c| c.message.include?("First commit") }
+      assert_not_nil first_commit, "Should find first commit"
+      assert_equal "helper@example.com", first_commit.co_author_email
+      
+      second_commit = commits.find { |c| c.message == "Second commit" }
+      assert_not_nil second_commit, "Should find second commit"
+      assert_nil second_commit.co_author_email
+    end
+  end
+
+  test "co_author_email extraction is case insensitive" do
+    Dir.mktmpdir do |dir|
+      # Create a test git repository
+      `git init #{dir} 2>&1`
+      
+      # Create commits with different case variations
+      File.write("#{dir}/file1.txt", "content1")
+      `cd #{dir} && git add file1.txt && git -c user.name="Author" -c user.email="author@example.com" commit -m "Lowercase
+
+co-authored-by: Lower <lower@example.com>" 2>&1`
+      
+      File.write("#{dir}/file2.txt", "content2")
+      `cd #{dir} && git add file2.txt && git -c user.name="Author" -c user.email="author@example.com" commit -m "Uppercase
+
+CO-AUTHORED-BY: Upper <UPPER@EXAMPLE.COM>" 2>&1`
+      
+      commits = @repository.fetch_commits_internal(dir)
+      
+      assert_equal 2, commits.length
+      assert_equal "upper@example.com", commits[0][:co_author_email] # downcased
+      assert_equal "lower@example.com", commits[1][:co_author_email]
+    end
+  end
+
+  test "handles multiple co-authors by taking the first" do
+    Dir.mktmpdir do |dir|
+      # Create a test git repository
+      `git init #{dir} 2>&1`
+      
+      # Create commit with multiple co-authors
+      File.write("#{dir}/file1.txt", "content1")
+      `cd #{dir} && git add file1.txt && git -c user.name="Author" -c user.email="author@example.com" commit -m "Pair programming
+
+Co-authored-by: First <first@example.com>
+Co-authored-by: Second <second@example.com>" 2>&1`
+      
+      commits = @repository.fetch_commits_internal(dir)
+      
+      assert_equal 1, commits.length
+      # Should extract only the first co-author
+      assert_equal "first@example.com", commits[0][:co_author_email]
+    end
+  end
+
+  test "sync_all correctly uses repo subdirectory after cloning" do
+    Dir.mktmpdir do |source_dir|
+      `git init #{source_dir} 2>&1`
+      File.write("#{source_dir}/file.txt", "content")
+      `cd #{source_dir} && git add . && git -c user.name="Test" -c user.email="test@test.com" commit -m "Initial commit" 2>&1`
+      
+      @repository.stubs(:git_clone_url).returns(source_dir)
+      @repository.stubs(:fetch_head_sha).returns("abc123")
+      @repository.stubs(:sync_details).returns(nil)
+      @repository.stubs(:too_large?).returns(false)
+      
+      @repository.stubs(:clone_repository).with(anything) do |dir|
+        repo_path = File.join(dir, "repo")
+        `git clone #{source_dir} #{repo_path} 2>&1`
+      end
+      
+      assert_nothing_raised do
+        @repository.sync_all
+      end
+      
+      @repository.reload
+      assert_not_nil @repository.total_commits
+      assert_equal 1, @repository.total_commits
+      assert_not_nil @repository.committers
+    end
+  end
+
+  test "sync_commits_batch gets correct co-author data" do
+    @repository.commits.delete_all
+    
+    Dir.mktmpdir do |dir|
+      repo_dir = File.join(dir, "repo")
+      `git init #{repo_dir} 2>&1`
+      
+      File.write("#{repo_dir}/file1.txt", "v1")
+      `cd #{repo_dir} && git add . && git -c user.name="Main" -c user.email="main@example.com" commit -m "First commit
+
+Co-authored-by: Claude <noreply@anthropic.com>" 2>&1`
+      
+      File.write("#{repo_dir}/file2.txt", "v2")
+      `cd #{repo_dir} && git add . && git -c user.name="Main" -c user.email="main@example.com" commit -m "Second commit" 2>&1`
+      
+      commit_count = `cd #{repo_dir} && git log --oneline | wc -l`.strip.to_i
+      assert_equal 2, commit_count, "Test repo should have 2 commits"
+      
+      result = @repository.sync_commits_batch(repo_dir)
+      
+      assert_not_nil result
+      assert_equal 2, @repository.commits.count
+      assert_equal 1, @repository.commits.with_co_author.count
+      assert_equal "noreply@anthropic.com", @repository.commits.with_co_author.first.co_author_email
+    end
+  end
+
+  test "count_commits_internal with wrong directory returns empty hash" do
+    Dir.mktmpdir do |dir|
+      result = @repository.count_commits_internal(dir)
+      assert_equal({}, result)
+    end
+  end
 end

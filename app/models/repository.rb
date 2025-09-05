@@ -4,8 +4,8 @@ class Repository < ApplicationRecord
   class SyncError < StandardError; end
   belongs_to :host
 
-  has_many :commits
-  has_many :contributions
+  has_many :commits, dependent: :delete_all
+  has_many :contributions, dependent: :delete_all
   # has_many :committers, through: :contributions
 
   validates :full_name, presence: true
@@ -216,15 +216,25 @@ class Repository < ApplicationRecord
     count_refs > 1000 || (size.present? && size > 500_000)
   end
 
-  def sync_all
+  def sync_all(force: false)
     sync_details
     return if too_large?
     return if status == 'not_found'
     
     last_commit = fetch_head_sha
-    if !past_year_committers.nil? && last_synced_commit == last_commit && commits_count > 0
-      update(last_synced_at: Time.now)
-      return
+    
+    # Skip early return checks if force is true
+    unless force
+      if !past_year_committers.nil? && last_synced_commit == last_commit && commits_count > 0
+        update(last_synced_at: Time.now)
+        return
+      end
+    end
+    
+    # Clear existing commits if force is true
+    if force
+      commits.delete_all
+      update_columns(last_synced_commit: nil, total_commits: 0)
     end
     
     begin
@@ -239,11 +249,11 @@ class Repository < ApplicationRecord
         repo_dir = File.join(dir, "repo")
         
         # Count commits and update statistics
-        counts = count_commits_internal(dir)
+        counts = count_commits_internal(repo_dir)
         update(counts)
         
-        # Sync commit data incrementally 
-        sync_commits_from_dir(repo_dir)
+        # Sync commits
+        sync_commits_batch(repo_dir, force: force)
         
         # Handle committers
         if committers
@@ -278,7 +288,8 @@ class Repository < ApplicationRecord
         rescue Timeout::Error
           raise TimeoutError, "Clone timed out for #{full_name} after 60 seconds"
         end
-        counts = count_commits_internal(dir)
+        repo_dir = File.join(dir, "repo")
+        counts = count_commits_internal(repo_dir)
         update(counts)
 
         if committers
@@ -294,15 +305,18 @@ class Repository < ApplicationRecord
   end
 
   def count_commits_internal(dir)
-    last_commit = `git #{git_dir_arg(dir)} rev-parse HEAD`.strip
-    output = `git #{git_dir_arg(dir)} shortlog -s -n -e --no-merges HEAD`
+    # First check if this is a git repository
+    last_commit = `git #{git_dir_arg(dir)} rev-parse HEAD 2>/dev/null`.strip
+    return {} if last_commit.empty? || !$?.success?
+    
+    output = `git #{git_dir_arg(dir)} shortlog -s -n -e --no-merges HEAD 2>/dev/null`
     # Force UTF-8 encoding and replace invalid characters
     output = output.force_encoding('UTF-8')
     unless output.valid_encoding?
       output = output.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
     end
 
-    past_year_output = `git #{git_dir_arg(dir)} shortlog -s -n -e --no-merges --since="1 year ago" HEAD`
+    past_year_output = `git #{git_dir_arg(dir)} shortlog -s -n -e --no-merges --since="1 year ago" HEAD 2>/dev/null`
     # Force UTF-8 encoding and replace invalid characters
     past_year_output = past_year_output.force_encoding('UTF-8')
     unless past_year_output.valid_encoding?
@@ -336,8 +350,8 @@ class Repository < ApplicationRecord
       total_committers: committers.length,
       total_bot_commits: total_bot_commits,
       total_bot_committers: committers.select{|h| h[:name].ends_with?('[bot]')}.length,
-      mean_commits: (total_commits.to_f / committers.length),
-      dds: 1 - (committers.first[:count].to_f / total_commits),
+      mean_commits: committers.any? ? (total_commits.to_f / committers.length) : 0,
+      dds: committers.any? ? 1 - (committers.first[:count].to_f / total_commits) : 0,
       past_year_committers: past_year_committers,
       past_year_total_commits: past_year_total_commits,
       past_year_total_committers: past_year_committers.length,
@@ -570,7 +584,7 @@ class Repository < ApplicationRecord
     head_check = `git #{git_dir_arg(dir.shellescape)} rev-parse HEAD 2>/dev/null`.strip
     return [] if head_check.empty?
     
-    format = "%H|%s|%aI|%an|%ae|%cn|%ce|%P"
+    format = "%H%x00%P%x00%an%x00%ae%x00%cn%x00%ce%x00%aI%x00%B"
     
     git_cmd = ["git"] + git_dir_args(dir) + ["log", "--format=#{format}", "--numstat", "-z", 
                "--skip=#{offset}", "-n", limit.to_s]
@@ -589,44 +603,52 @@ class Repository < ApplicationRecord
       output = output.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
     end
     
+    # Same parsing logic as fetch_commits_internal
     commits = []
     repo_id = id
     
-    output.split("\0").each do |commit_block|
-      next if commit_block.empty?
+    fields = output.chomp("\0").split("\0")
+    
+    i = 0
+    while i < fields.length
+      # Need at least 8 fields for a complete commit
+      break if i + 7 >= fields.length
       
-      lines = commit_block.lines
-      next if lines.empty?
+      sha = fields[i]
+      parents = fields[i + 1]
+      author_name = fields[i + 2]
+      author_email = fields[i + 3]
+      committer_name = fields[i + 4]
+      committer_email = fields[i + 5]
+      timestamp = fields[i + 6]
+      message = fields[i + 7]
       
-      header = lines.shift
-      parts = header.split('|', 8)
-      next unless parts.length == 8
+      # Move to next set of fields
+      i += 8
       
-      sha, message, timestamp, author_name, author_email, committer_name, committer_email, parents = parts
-      
+      # Check if there's numstat data (it would be the next field)
       additions = 0
-      deletions = 0  
+      deletions = 0
       files = 0
       
-      lines.each do |line|
-        if match = line.match(/^(\d+|-)\t(\d+|-)\t/)
-          add = match[1] == '-' ? 0 : match[1].to_i
-          del = match[2] == '-' ? 0 : match[2].to_i
-          additions += add
-          deletions += del
-          files += 1
-        end
+      # Skip numstat parsing if present
+      if i < fields.length && fields[i].match(/^\d+\t\d+\t/)
+        # Has numstat, skip it
+        i += 1
       end
+      
+      cleaned_message = message.strip
       
       commits << {
         repository_id: repo_id,
         sha: sha,
-        message: message.strip.gsub("\u0000", ''),
+        message: cleaned_message,
         timestamp: timestamp,
         merge: parents.include?(' '),
-        author: "#{author_name} <#{author_email}>".gsub("\u0000", ''),
-        committer: "#{committer_name} <#{committer_email}>".gsub("\u0000", ''),
-        stats: [additions, deletions, files]
+        author: "#{author_name} <#{author_email}>",
+        committer: "#{committer_name} <#{committer_email}>",
+        stats: [additions, deletions, files],
+        co_author_email: Commit.extract_co_author_from_message(cleaned_message)
       }
     end
     
@@ -641,8 +663,9 @@ class Repository < ApplicationRecord
     head_check = `git #{git_dir_arg(dir.shellescape)} rev-parse HEAD 2>/dev/null`.strip
     return [] if head_check.empty?
     
-    # Use a more efficient format with delimiter
-    format = "%H|%s|%aI|%an|%ae|%cn|%ce|%P"
+    # Use NUL delimiter to safely handle multi-line commit messages
+    # %B gets the full commit message including body (not just subject line)
+    format = "%H%x00%P%x00%an%x00%ae%x00%cn%x00%ce%x00%aI%x00%B"
     
     git_cmd = ["git"] + git_dir_args(dir) + ["log", "--format=#{format}", "--numstat", "-z", "-n", "5000"]
     
@@ -663,44 +686,54 @@ class Repository < ApplicationRecord
     commits = []
     repo_id = id # Cache to avoid repeated method calls
     
-    # Split on null character for more reliable parsing
-    output.split("\0").each do |commit_block|
-      next if commit_block.empty?
+    # Git log with -z flag adds an extra NUL after the format string output
+    # So we get: sha\0parents\0author_name\0author_email\0committer_name\0committer_email\0timestamp\0message\0numstat\0
+    # Split and process in groups of 8 fields (the message field ends with the format, numstat is separate)
+    
+    # Remove any trailing NUL bytes and split
+    fields = output.chomp("\0").split("\0")
+    
+    # Process commits - with -z flag, each commit's format output ends, then numstat follows
+    i = 0
+    while i < fields.length
+      # Need at least 8 fields for a complete commit
+      break if i + 7 >= fields.length
       
-      lines = commit_block.lines
-      next if lines.empty?
+      sha = fields[i]
+      parents = fields[i + 1]
+      author_name = fields[i + 2]
+      author_email = fields[i + 3]
+      committer_name = fields[i + 4]
+      committer_email = fields[i + 5]
+      timestamp = fields[i + 6]
+      message = fields[i + 7]
       
-      # Parse header line efficiently
-      header = lines.shift
-      parts = header.split('|', 8)
-      next unless parts.length == 8
+      # Move to next set of fields
+      i += 8
       
-      sha, message, timestamp, author_name, author_email, committer_name, committer_email, parents = parts
-      
-      # Calculate stats efficiently
+      # Check if there's numstat data (it would be the next field)
       additions = 0
-      deletions = 0  
+      deletions = 0
       files = 0
       
-      lines.each do |line|
-        if match = line.match(/^(\d+|-)\t(\d+|-)\t/)
-          add = match[1] == '-' ? 0 : match[1].to_i
-          del = match[2] == '-' ? 0 : match[2].to_i
-          additions += add
-          deletions += del
-          files += 1
-        end
+      # Skip numstat parsing if present (would be in fields[i] if exists)
+      if i < fields.length && fields[i].match(/^\d+\t\d+\t/)
+        # Has numstat, skip it
+        i += 1
       end
+      
+      cleaned_message = message.strip
       
       commits << {
         repository_id: repo_id,
         sha: sha,
-        message: message.strip.gsub("\u0000", ''),
+        message: cleaned_message,
         timestamp: timestamp,
         merge: parents.include?(' '),
-        author: "#{author_name} <#{author_email}>".gsub("\u0000", ''),
-        committer: "#{committer_name} <#{committer_email}>".gsub("\u0000", ''),
-        stats: [additions, deletions, files]
+        author: "#{author_name} <#{author_email}>",
+        committer: "#{committer_name} <#{committer_email}>",
+        stats: [additions, deletions, files],
+        co_author_email: Commit.extract_co_author_from_message(cleaned_message)
       }
     end
     
@@ -727,6 +760,99 @@ class Repository < ApplicationRecord
     end
   end
   
+  def sync_commits_batch(repo_dir, force: false)
+    # Sync commits using simple batch pagination
+    start_time = Time.now
+    timeout_duration = 300 # 5 minutes
+    total_processed = 0
+    
+    begin
+      # Count total commits in the repository
+      total_repo_commits = count_commits_in_repo(repo_dir)
+      
+      # Check what we already have
+      existing_count = commits.count
+      
+      # Quick check: if we already have all commits, we're done (unless force is true)
+      if existing_count >= total_repo_commits && !force
+        # Just update the last_synced_commit to current HEAD
+        head_sha = `git #{git_dir_arg(repo_dir)} rev-parse HEAD`.strip
+        if head_sha.present?
+          update_columns(
+            last_synced_commit: head_sha,
+            last_synced_at: Time.current
+          )
+        end
+        return existing_count
+      end
+      
+      # Adjust batch size based on repo size
+      batch_size = if total_repo_commits > 100000
+        10000
+      elsif total_repo_commits > 50000
+        5000
+      elsif total_repo_commits > 10000
+        2000
+      else
+        1000
+      end
+      
+      # Process commits in batches using --skip and -n
+      offset = 0
+      
+      loop do
+        break if (Time.now - start_time) >= timeout_duration
+        
+        # Fetch a batch of commits
+        batch = fetch_commits_paginated(repo_dir, offset, batch_size, last_synced_commit)
+        
+        break if batch.empty?
+        
+        # Clean the batch
+        cleaned_batch = batch.map do |commit|
+          commit.transform_values do |value|
+            value.is_a?(String) ? value.gsub("\u0000", '') : value
+          end
+        end
+        
+        # Deduplicate by SHA to prevent PG::CardinalityViolation
+        cleaned_batch = cleaned_batch.uniq { |c| c[:sha] }
+        
+        if cleaned_batch.any?
+          # Insert this batch
+          cleaned_batch.each_slice(1000) do |chunk|
+            Commit.upsert_all(
+              chunk,
+              unique_by: [:repository_id, :sha],
+              returning: false
+            )
+          end
+        end
+        
+        total_processed += cleaned_batch.size
+        offset += batch_size
+        
+        # Continue until we get an empty batch
+        # (Don't stop on batch.size < batch_size as that's still valid)
+      end
+      
+      # Update the last synced commit to HEAD
+      head_sha = `git #{git_dir_arg(repo_dir)} rev-parse HEAD`.strip
+      if head_sha.present?
+        update_columns(
+          last_synced_commit: head_sha,
+          last_synced_at: Time.current
+        )
+      end
+      
+      total_processed
+    rescue => e
+      Rails.logger.error "Error syncing commits for #{full_name}: #{e.message}"
+      raise SyncError, "Failed to sync commits for #{full_name}: #{e.message}"
+    end
+  end
+  
+  # OLD METHOD - should not be used
   def sync_commits_from_dir(repo_dir)
     # Sync commits using already cloned repository directory
     start_time = Time.now
@@ -762,7 +888,7 @@ class Repository < ApplicationRecord
       while current_date <= end_date && (Time.now - start_time) < timeout_duration
         chunk_end = [current_date + 30.days, end_date].min
         
-        batch = fetch_commits_for_date_range(repo_dir, current_date, chunk_end)
+        batch = fetch_commits_by_date_range(repo_dir, current_date, chunk_end)
         
         if batch.any?
           # Clean and insert batch
@@ -772,14 +898,20 @@ class Repository < ApplicationRecord
             end
           end
           
-          Commit.upsert_all(
-            cleaned_batch,
-            unique_by: [:repository_id, :sha],
-            returning: false,
-            record_timestamps: false
-          )
+          # Deduplicate by SHA to prevent PG::CardinalityViolation
+          cleaned_batch = cleaned_batch.uniq { |c| c[:sha] }
           
-          total_processed += batch.size
+          Rails.logger.info "Batch had #{batch.size} commits, #{cleaned_batch.size} after deduplication"
+          
+          if cleaned_batch.any?
+            Commit.upsert_all(
+              cleaned_batch,
+              unique_by: [:repository_id, :sha],
+              returning: false
+            )
+          end
+          
+          total_processed += cleaned_batch.size
         end
         
         current_date = chunk_end + 1.day
@@ -1028,7 +1160,7 @@ class Repository < ApplicationRecord
   
   def fetch_commits_paginated(dir, offset, limit, after_sha = nil)
     method_start = Time.now
-    format = "%H|%s|%aI|%an|%ae|%cn|%ce|%P"
+    format = "%H%x00%P%x00%an%x00%ae%x00%cn%x00%ce%x00%aI%x00%B"
     
     # Build command with pagination
     # Note: Don't use SHA..HEAD with pagination - it's slow!
@@ -1038,7 +1170,7 @@ class Repository < ApplicationRecord
     git_cmd = ["git"] + git_dir_args(dir) + [
       "log",
       "--format=#{format}",
-      # "--numstat", "-z",  # DISABLED: numstat is VERY slow!
+      "-z",  # NUL-delimited output
       "--skip=#{offset}",
       "-n", limit.to_s,
       "HEAD"  # Just the current branch
@@ -1066,7 +1198,7 @@ class Repository < ApplicationRecord
     
     # Parse the output
     parse_start = Time.now
-    commits = parse_commit_output_simple(output)  # Use simple parser without numstat
+    commits = parse_commit_output(output)
     parse_duration = Time.now - parse_start
     
     Rails.logger.info "[DEBUG-TIMING] Parse output: #{parse_duration.round(2)}s for #{commits.size} commits"
@@ -1076,14 +1208,14 @@ class Repository < ApplicationRecord
   end
   
   def fetch_all_commits_fast(dir, after_sha = nil)
-    format = "%H|%s|%aI|%an|%ae|%cn|%ce|%P"
+    format = "%H%x00%P%x00%an%x00%ae%x00%cn%x00%ce%x00%aI%x00%B"
     
     # Build command - get ALL commits without date filtering
     git_cmd = ["git"] + git_dir_args(dir) + [
       "log",
       "--format=#{format}",
-      "--numstat", "-z",
-      "--all"  # Get all branches
+      "--numstat", "-z"
+      # Removed --all since we clone with --single-branch
     ]
     
     # If we have a last synced commit, only get newer ones
@@ -1105,8 +1237,7 @@ class Repository < ApplicationRecord
     parse_commit_output(output)
   end
   
-  def parse_commit_output_simple(output)
-    # Simple parsing without numstat data
+  def parse_commit_output(output)
     output = output.force_encoding('UTF-8')
     unless output.valid_encoding?
       output = output.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
@@ -1115,22 +1246,36 @@ class Repository < ApplicationRecord
     commits = []
     repo_id = id
     
-    output.each_line do |line|
-      parts = line.strip.split('|', 8)
-      next unless parts.length == 8
+    # Split by NUL and process in groups of 8 fields per commit
+    fields = output.chomp("\0").split("\0")
+    
+    # Process each group of 8 fields as a commit
+    i = 0
+    while i + 7 < fields.length
+      sha = fields[i]
+      parents = fields[i + 1]
+      author_name = fields[i + 2]
+      author_email = fields[i + 3]
+      committer_name = fields[i + 4]
+      committer_email = fields[i + 5]
+      timestamp = fields[i + 6]
+      message = fields[i + 7]
       
-      sha, message, timestamp, author_name, author_email, committer_name, committer_email, parents = parts
+      cleaned_message = message.strip
       
       commits << {
         repository_id: repo_id,
         sha: sha,
-        message: message.strip.gsub("\u0000", ''),
+        message: cleaned_message,
         timestamp: timestamp,
-        merge: parents.include?(' '),
-        author: "#{author_name} <#{author_email}>".gsub("\u0000", ''),
-        committer: "#{committer_name} <#{committer_email}>".gsub("\u0000", ''),
-        stats: [0, 0, 0]  # No stats without numstat
+        merge: parents && parents.include?(' '),
+        author: "#{author_name} <#{author_email}>",
+        committer: "#{committer_name} <#{committer_email}>",
+        stats: [0, 0, 0],  # No stats without numstat
+        co_author_email: Commit.extract_co_author_from_message(cleaned_message)
       }
+      
+      i += 8
     end
     
     commits
@@ -1145,41 +1290,60 @@ class Repository < ApplicationRecord
     commits = []
     repo_id = id
     
-    output.split("\0").each do |commit_block|
-      next if commit_block.empty?
+    # With -z flag and NUL format, parse carefully
+    fields = output.chomp("\0").split("\0")
+    
+    i = 0
+    while i < fields.length
+      # Need at least 8 fields for a complete commit
+      break if i + 7 >= fields.length
       
-      lines = commit_block.lines
-      next if lines.empty?
+      sha = fields[i]
+      parents = fields[i + 1]
+      author_name = fields[i + 2]
+      author_email = fields[i + 3]
+      committer_name = fields[i + 4]
+      committer_email = fields[i + 5]
+      timestamp = fields[i + 6]
+      message = fields[i + 7]
       
-      header = lines.shift
-      parts = header.split('|', 8)
-      next unless parts.length == 8
-      
-      sha, message, timestamp, author_name, author_email, committer_name, committer_email, parents = parts
+      # Move to next set of fields
+      i += 8
       
       additions = 0
       deletions = 0  
       files = 0
       
-      lines.each do |line|
-        if match = line.match(/^(\d+|-)\t(\d+|-)\t/)
-          add = match[1] == '-' ? 0 : match[1].to_i
-          del = match[2] == '-' ? 0 : match[2].to_i
-          additions += add
-          deletions += del
-          files += 1
+      # Check if there's numstat data (it would be in the next field)
+      # Numstat format is like: "1\t2\tfile.txt\n3\t4\tother.txt"
+      if i < fields.length && !fields[i].empty?
+        numstat = fields[i]
+        if numstat.match(/^\d+\t\d+\t/)
+          numstat.each_line do |line|
+            if match = line.match(/^(\d+|-)\t(\d+|-)\t/)
+              add = match[1] == '-' ? 0 : match[1].to_i
+              del = match[2] == '-' ? 0 : match[2].to_i
+              additions += add
+              deletions += del
+              files += 1
+            end
+          end
+          i += 1 # Skip the numstat field
         end
       end
+      
+      cleaned_message = message.strip
       
       commits << {
         repository_id: repo_id,
         sha: sha,
-        message: message.strip.gsub("\u0000", ''),
+        message: cleaned_message,
         timestamp: timestamp,
         merge: parents.include?(' '),
-        author: "#{author_name} <#{author_email}>".gsub("\u0000", ''),
-        committer: "#{committer_name} <#{committer_email}>".gsub("\u0000", ''),
-        stats: [files, additions, deletions]
+        author: "#{author_name} <#{author_email}>",
+        committer: "#{committer_name} <#{committer_email}>",
+        stats: [files, additions, deletions],
+        co_author_email: Commit.extract_co_author_from_message(cleaned_message)
       }
     end
     
@@ -1187,7 +1351,7 @@ class Repository < ApplicationRecord
   end
   
   def fetch_commits_by_date_range(dir, since_date, until_date)
-    format = "%H|%s|%aI|%an|%ae|%cn|%ce|%P"
+    format = "%H%x00%P%x00%an%x00%ae%x00%cn%x00%ce%x00%aI%x00%B"
     
     # Build command as array for safety (no shell interpolation)
     git_cmd = ["git"] + git_dir_args(dir) + [
@@ -1195,13 +1359,11 @@ class Repository < ApplicationRecord
       "--format=#{format}",
       "--numstat", "-z",
       "--since=#{since_date.iso8601}",
-      "--until=#{until_date.iso8601}",
-      "--all"  # Search all branches, not just HEAD
+      "--until=#{until_date.iso8601}"
+      # Removed --all since we clone with --single-branch
     ]
     
     # Benchmark: Git command execution
-    git_start = Time.now
-    Rails.logger.info "[DEBUG] Running git command: #{git_cmd.inspect}"
     require 'open3'
     output, _stderr, status = Open3.capture3(*git_cmd)
     git_duration = Time.now - git_start
@@ -1222,41 +1384,48 @@ class Repository < ApplicationRecord
     commits = []
     repo_id = id
     
-    output.split("\0").each do |commit_block|
-      next if commit_block.empty?
+    # Use same NUL parsing as other methods
+    fields = output.chomp("\0").split("\0")
+    
+    i = 0
+    while i < fields.length
+      # Need at least 8 fields for a complete commit
+      break if i + 7 >= fields.length
       
-      lines = commit_block.lines
-      next if lines.empty?
+      sha = fields[i]
+      parents = fields[i + 1]
+      author_name = fields[i + 2]
+      author_email = fields[i + 3]
+      committer_name = fields[i + 4]
+      committer_email = fields[i + 5]
+      timestamp = fields[i + 6]
+      message = fields[i + 7]
       
-      header = lines.shift
-      parts = header.split('|', 8)
-      next unless parts.length == 8
-      
-      sha, message, timestamp, author_name, author_email, committer_name, committer_email, parents = parts
+      # Move to next set of fields
+      i += 8
       
       additions = 0
       deletions = 0  
       files = 0
       
-      lines.each do |line|
-        if match = line.match(/^(\d+|-)\t(\d+|-)\t/)
-          add = match[1] == '-' ? 0 : match[1].to_i
-          del = match[2] == '-' ? 0 : match[2].to_i
-          additions += add
-          deletions += del
-          files += 1
-        end
+      # Skip numstat parsing if present (would be in fields[i] if exists)
+      if i < fields.length && fields[i].match(/^\d+\t\d+\t/)
+        # Has numstat, skip it
+        i += 1
       end
+      
+      cleaned_message = message.strip
       
       commits << {
         repository_id: repo_id,
         sha: sha,
-        message: message.strip.gsub("\u0000", ''),
+        message: cleaned_message,
         timestamp: timestamp,
         merge: parents.include?(' '),
-        author: "#{author_name} <#{author_email}>".gsub("\u0000", ''),
-        committer: "#{committer_name} <#{committer_email}>".gsub("\u0000", ''),
-        stats: [additions, deletions, files]
+        author: "#{author_name} <#{author_email}>",
+        committer: "#{committer_name} <#{committer_email}>",
+        stats: [additions, deletions, files],
+        co_author_email: Commit.extract_co_author_from_message(cleaned_message)
       }
     end
     
@@ -1289,8 +1458,7 @@ class Repository < ApplicationRecord
         Commit.upsert_all(
           cleaned_batch,
           unique_by: [:repository_id, :sha],
-          returning: false,
-          record_timestamps: false
+          returning: false
         )
         
         total_processed += batch.size

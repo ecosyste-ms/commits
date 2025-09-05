@@ -6,6 +6,9 @@ class Commit < ApplicationRecord
 
   scope :since, ->(date) { where('timestamp > ?', date) }
   scope :until, ->(date) { where('timestamp < ?', date) }
+  scope :with_co_author, -> { where.not(co_author_email: nil) }
+  
+  before_save :extract_co_author_email
 
   def labelled_stats
     {
@@ -51,5 +54,21 @@ class Commit < ApplicationRecord
         email: email.strip
       }
     end
+  end
+  
+  def extract_co_author_email
+    # Use the first co-author from the existing co_authors method
+    first_co_author = co_authors.first
+    if first_co_author
+      self.co_author_email = first_co_author[:email].downcase
+    end
+  end
+  
+  def self.extract_co_author_from_message(message)
+    return nil if message.blank?
+    
+    # Extract email from: Co-authored-by: Name <email@example.com>
+    match = message.match(/Co-authored-by:\s*.*?<(.+?)>/i)
+    match[1].strip.downcase if match
   end
 end
