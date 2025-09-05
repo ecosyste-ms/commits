@@ -1159,37 +1159,20 @@ class Repository < ApplicationRecord
   end
   
   def fetch_commits_paginated(dir, offset, limit, after_sha = nil)
-    method_start = Time.now
     format = "%H%x00%P%x00%an%x00%ae%x00%cn%x00%ce%x00%aI%x00%B"
     
     # Build command with pagination
-    # Note: Don't use SHA..HEAD with pagination - it's slow!
-    # Don't use --all either - it's also slow with many branches
-    # Just get commits from the current branch (usually main/master)
-    build_start = Time.now
     git_cmd = ["git"] + git_dir_args(dir) + [
       "log",
       "--format=#{format}",
       "-z",  # NUL-delimited output
       "--skip=#{offset}",
       "-n", limit.to_s,
-      "HEAD"  # Just the current branch
+      "HEAD"
     ]
-    Rails.logger.info "[DEBUG-TIMING] Command build: #{(Time.now - build_start).round(4)}s"
     
-    Rails.logger.info "[DEBUG] Running git command: #{git_cmd.join(' ')}"
-    Rails.logger.info "[DEBUG] Directory: #{dir}"
-    Rails.logger.info "[DEBUG] Offset: #{offset}, Limit: #{limit}"
-    
-    git_start = Time.now
     require 'open3'
     output, stderr, status = Open3.capture3(*git_cmd)
-    git_duration = Time.now - git_start
-    
-    Rails.logger.info "[DEBUG-TIMING] Git command execution: #{git_duration.round(2)}s"
-    Rails.logger.info "[DEBUG] Output size: #{output.bytesize} bytes"
-    Rails.logger.info "[DEBUG] Exit status: #{status.exitstatus}"
-    Rails.logger.info "[DEBUG] Stderr: #{stderr}" if stderr && !stderr.empty?
     
     unless status.exitstatus == 0
       Rails.logger.error "Git log failed: exit #{status.exitstatus}, stderr: #{stderr}"
@@ -1197,12 +1180,7 @@ class Repository < ApplicationRecord
     end
     
     # Parse the output
-    parse_start = Time.now
     commits = parse_commit_output(output)
-    parse_duration = Time.now - parse_start
-    
-    Rails.logger.info "[DEBUG-TIMING] Parse output: #{parse_duration.round(2)}s for #{commits.size} commits"
-    Rails.logger.info "[DEBUG-TIMING] Total method time: #{(Time.now - method_start).round(2)}s"
     
     commits
   end
@@ -1222,8 +1200,6 @@ class Repository < ApplicationRecord
     if after_sha && commits.exists?(sha: after_sha)
       git_cmd << "#{after_sha}..HEAD"
     end
-    
-    Rails.logger.info "[DEBUG] Running git command: #{git_cmd.join(' ')}"
     
     require 'open3'
     output, _stderr, status = Open3.capture3(*git_cmd)
