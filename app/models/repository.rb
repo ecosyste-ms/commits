@@ -164,8 +164,23 @@ class Repository < ApplicationRecord
     "#{host.url}/#{full_name}.git"
   end
 
+  def git_env_no_prompt
+    {
+      'GIT_TERMINAL_PROMPT' => '0',
+      'GIT_ASKPASS' => 'echo',
+      'SSH_ASKPASS' => 'echo'
+    }
+  end
+
+  def git_command(*args)
+    require 'open3'
+    Open3.capture3(git_env_no_prompt, 'git', *args)
+  end
+
   def fetch_head_sha
-    `git ls-remote #{git_clone_url} #{default_branch}`.split("\t").first
+    output, error, status = git_command('ls-remote', git_clone_url, default_branch)
+    return nil unless status.success?
+    output.split("\t").first
   end
 
   def git_dir_args(dir)
@@ -192,16 +207,7 @@ class Repository < ApplicationRecord
     # Use --filter=blob:none to skip file contents (we only need commit history)
     # Use --single-branch since we only fetch commits from HEAD anyway
     
-    # Prevent any credential prompts - fail immediately for private repos
-    env = {
-      'GIT_TERMINAL_PROMPT' => '0',
-      'GIT_ASKPASS' => 'echo',
-      'SSH_ASKPASS' => 'echo'
-    }
-    
-    require 'open3'
-    cmd = ['git', 'clone', '--filter=blob:none', '--single-branch', '--quiet', git_clone_url, repo_path]
-    output, error, status = Open3.capture3(env, *cmd)
+    output, error, status = git_command('clone', '--filter=blob:none', '--single-branch', '--quiet', git_clone_url, repo_path)
     
     unless status.success?
       full_output = [output, error].compact.join("\n")
@@ -221,8 +227,14 @@ class Repository < ApplicationRecord
   # TODO support hg and svn repos
 
   def count_refs
-    refs = `git ls-remote --heads --tags #{git_clone_url}`
-    refs.lines.count
+    output, error, status = git_command('ls-remote', '--heads', '--tags', git_clone_url)
+    
+    unless status.success?
+      Rails.logger.error "Failed to count refs for #{full_name}: #{error}"
+      return 0
+    end
+    
+    output.lines.count
   rescue => e
     Rails.logger.error "Failed to count refs for #{full_name}: #{e.message}"
     0
@@ -232,14 +244,19 @@ class Repository < ApplicationRecord
     count_refs > 1000 || (size.present? && size > 500_000)
   end
 
-  def sync_all(force: false)
+  def should_skip_sync?
     sync_details
-    return if too_large?
+    return true if too_large?
     if status == 'not_found'
       # Update last_synced_at even for not_found repos to avoid repeated attempts
       update_column(:last_synced_at, Time.now)
-      return
+      return true
     end
+    false
+  end
+
+  def sync_all(force: false)
+    return if should_skip_sync?
     
     last_commit = fetch_head_sha
     

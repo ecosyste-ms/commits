@@ -407,18 +407,9 @@ class RepositoryTest < ActiveSupport::TestCase
   test "clone_repository marks repository as not_found when deleted from GitHub" do
     Dir.mktmpdir do |dir|
       # Stub the git clone command to simulate a deleted repository error
-      Open3.stubs(:capture3).with(anything) do |cmd|
-        if cmd.include?("git clone")
-          ["", "fatal: could not read Username for 'https://github.com': No such device or address", double(success?: false)]
-        else
-          ["", "", double(success?: true)]
-        end
-      end
-      
-      # Use the shell command approach that matches the actual implementation
-      output = "fatal: could not read Username for 'https://github.com': No such device or address"
-      @repository.stubs(:`).returns(output)
-      `exit 1` # Set $? to indicate failure
+      @repository.stubs(:git_command).with('clone', '--filter=blob:none', '--single-branch', '--quiet', @repository.git_clone_url, anything).returns(
+        ["", "fatal: could not read Username for 'https://github.com': No such device or address", stub(success?: false)]
+      )
       
       error = assert_raises(Repository::CloneError) do
         @repository.clone_repository(dir)
@@ -448,9 +439,9 @@ class RepositoryTest < ActiveSupport::TestCase
   test "clone_repository raises regular CloneError for other failures" do
     Dir.mktmpdir do |dir|
       # Stub the git clone command to simulate a different error
-      output = "fatal: unable to access 'https://github.com/test/repo.git/': Connection timed out"
-      @repository.stubs(:`).returns(output)
-      `exit 1` # Set $? to indicate failure
+      @repository.stubs(:git_command).with('clone', '--filter=blob:none', '--single-branch', '--quiet', @repository.git_clone_url, anything).returns(
+        ["", "fatal: unable to access 'https://github.com/test/repo.git/': Connection timed out", stub(success?: false)]
+      )
       
       error = assert_raises(Repository::CloneError) do
         @repository.clone_repository(dir)
