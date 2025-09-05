@@ -191,11 +191,14 @@ class Repository < ApplicationRecord
     repo_path = File.join(dir, "repo")
     # Use --filter=blob:none to skip file contents (we only need commit history)
     # Use --single-branch since we only fetch commits from HEAD anyway
-    # Set GIT_TERMINAL_PROMPT=0 to prevent any credential prompts
-    output = `GIT_TERMINAL_PROMPT=0 git clone --filter=blob:none --single-branch --quiet #{git_clone_url.shellescape} #{repo_path.shellescape} 2>&1`
+    # Prevent any credential prompts - fail immediately for private repos
+    output = `export GIT_TERMINAL_PROMPT=0 GIT_ASKPASS=/bin/echo && git clone --filter=blob:none --single-branch --quiet #{git_clone_url.shellescape} #{repo_path.shellescape} 2>&1`
     unless $?.success?
-      # Check if the repository has been deleted from GitHub
-      if output.include?("could not read Username") || output.include?("Repository not found") || output.include?("Authentication failed")
+      # Check if the repository has been deleted from GitHub or is private
+      if output.include?("could not read Username") || 
+         output.include?("Repository not found") || 
+         output.include?("Authentication failed") ||
+         output.include?("terminal prompts disabled")
         update_column(:status, 'not_found')
         raise CloneError, "Repository #{full_name} appears to be deleted or private"
       end
