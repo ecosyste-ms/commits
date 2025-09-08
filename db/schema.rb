@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_08_091705) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_08_093111) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -39,7 +39,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_08_091705) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["emails"], name: "index_committers_on_emails", using: :gin
-    t.index ["host_id"], name: "index_committers_on_host_id"
+    t.index ["host_id", "login"], name: "index_committers_on_host_id_and_login"
   end
 
   create_table "contributions", force: :cascade do |t|
