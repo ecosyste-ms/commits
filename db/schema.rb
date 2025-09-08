@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_08_093111) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_08_094259) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -114,6 +114,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_08_093111) do
     t.string "icon_url"
     t.integer "size"
     t.index "host_id, lower((full_name)::text)", name: "index_repositories_on_host_id_lower_full_name", unique: true
+    t.index ["host_id", "owner"], name: "index_repositories_on_host_id_and_owner"
   end
 
   add_foreign_key "contributions", "committers"

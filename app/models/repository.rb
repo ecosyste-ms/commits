@@ -18,7 +18,7 @@ class Repository < ApplicationRecord
   scope :visible, -> { active.where.not(last_synced_at: nil).where.not(total_commits: nil) }
   scope :created_after, ->(date) { where('created_at > ?', date) }
   scope :updated_after, ->(date) { where('updated_at > ?', date) }
-  scope :owner, ->(owner) { where('full_name LIKE ?', "#{owner}/%") }
+  scope :owner, ->(owner) { where(owner: owner.downcase) }
 
   scope :committer, ->(login) { 
     where("EXISTS (
@@ -105,7 +105,7 @@ class Repository < ApplicationRecord
   end
 
   def set_owner
-    self.owner = full_name.split('/').first
+    self.owner = full_name.split('/').first&.downcase
   end
 
   def owner
