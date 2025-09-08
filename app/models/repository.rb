@@ -269,6 +269,7 @@ class Repository < ApplicationRecord
     
     # Force sync if repository was last synced before multi-line commit message fix
     if !force && last_synced_at.present? && last_synced_at < MULTILINE_FIX_TIME
+      puts "Forcing full sync for #{full_name} due to multi-line commit message fix"
       force = true
     end
     
