@@ -113,7 +113,10 @@ class Repository < ApplicationRecord
   end
 
   def sync_async(remote_ip = '0.0.0.0')
-    return if last_synced_at.present? && last_synced_at > 1.week.ago
+    # Skip if recently synced, unless it was before the multiline fix
+    if last_synced_at.present? && last_synced_at > 1.week.ago && last_synced_at >= MULTILINE_FIX_TIME
+      return
+    end
 
     job = Job.new(url: html_url, status: 'pending', ip: remote_ip)
     if job.save
