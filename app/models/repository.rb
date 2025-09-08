@@ -2,6 +2,10 @@ class Repository < ApplicationRecord
   class CloneError < StandardError; end
   class TimeoutError < StandardError; end
   class SyncError < StandardError; end
+  
+  # Time when multi-line commit message fix was deployed
+  MULTILINE_FIX_TIME = Time.parse('2025-09-05T21:42:32+01:00').freeze
+  
   belongs_to :host
 
   has_many :commits, dependent: :delete_all
@@ -257,6 +261,11 @@ class Repository < ApplicationRecord
 
   def sync_all(force: false)
     return if should_skip_sync?
+    
+    # Force sync if repository was last synced before multi-line commit message fix
+    if !force && last_synced_at.present? && last_synced_at < MULTILINE_FIX_TIME
+      force = true
+    end
     
     last_commit = fetch_head_sha
     
