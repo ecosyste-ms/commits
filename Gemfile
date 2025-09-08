@@ -33,7 +33,6 @@ gem 'faraday-typhoeus'
 gem 'sitemap_generator'
 gem 'sidekiq'
 gem 'sidekiq-unique-jobs'
-gem 'sidekiq-status'
 gem 'addressable'
 gem 'appsignal'
 gem "groupdate"
