@@ -76,7 +76,7 @@
               </small>
             </td>
             <td>
-              <small><%= time_ago_in_words(commit.timestamp) %> ago</small>
+              <small><%= commit.timestamp ? time_ago_in_words(commit.timestamp) + ' ago' : 'Unknown' %></small>
             </td>
             <td>
             </td>
