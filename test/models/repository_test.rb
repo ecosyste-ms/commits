@@ -281,13 +281,16 @@ class RepositoryTest < ActiveSupport::TestCase
       File.write("#{dir}/file1.txt", "content1")
       `cd #{dir} && git add file1.txt && git -c user.name="Test User" -c user.email="test@example.com" commit -m "Initial commit" 2>&1`
       
+      # Get the default branch name (could be main or master)
+      default_branch = `cd #{dir} && git rev-parse --abbrev-ref HEAD 2>&1`.strip
+      
       # Create a branch and add a commit
       `cd #{dir} && git checkout -b feature 2>&1`
       File.write("#{dir}/feature.txt", "feature content")
       `cd #{dir} && git add feature.txt && git -c user.name="Test User" -c user.email="test@example.com" commit -m "Feature commit" 2>&1`
       
-      # Go back to main and add another commit
-      `cd #{dir} && git checkout main 2>&1`
+      # Go back to default branch and add another commit
+      `cd #{dir} && git checkout #{default_branch} 2>&1`
       File.write("#{dir}/main.txt", "main content")
       `cd #{dir} && git add main.txt && git -c user.name="Test User" -c user.email="test@example.com" commit -m "Main commit" 2>&1`
       
