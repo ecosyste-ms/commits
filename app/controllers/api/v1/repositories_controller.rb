@@ -81,14 +81,7 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
     
     # Skip if recently synced
     if @repository.last_synced_at.blank? || @repository.last_synced_at < 1.day.ago
-      job = Job.create!(
-        url: @repository.html_url || "https://#{@host.name}/#{@repository.full_name}",
-        status: 'pending',
-        ip: request.remote_ip
-      )
-      
-      sidekiq_id = ParseCommitsWorker.perform_async(job.id)
-      job.update(sidekiq_id: sidekiq_id)
+      @repository.sync_async(request.remote_ip)
     end
     
     render json: { message: 'pong' }

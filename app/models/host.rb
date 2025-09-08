@@ -46,12 +46,8 @@ class Host < ApplicationRecord
 
   def sync_repository_async(full_name, remote_ip = '0.0.0.0')
     repo = Repository.find_or_create_from_host(self, full_name)
-    
-    job = Job.new(url: repo.html_url, status: 'pending', ip: remote_ip)
-    if job.save
-      job.parse_commits_async
-    end
-    job
+    repo.sync_async(remote_ip) if repo
+    repo
   end
 
   def sync_recently_updated_repositories_async

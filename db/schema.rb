@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_05_161752) do
+ActiveRecord::Schema[8.0].define(version: 2025_09_08_091705) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -81,17 +81,6 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_05_161752) do
     t.text "host_url"
     t.text "repositories_url"
     t.text "owners_url"
-  end
-
-  create_table "jobs", id: :uuid, default: -> { "gen_random_uuid()" }, force: :cascade do |t|
-    t.string "sidekiq_id"
-    t.string "status"
-    t.string "url"
-    t.string "ip"
-    t.json "results"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["status"], name: "index_jobs_on_status"
   end
 
   create_table "repositories", force: :cascade do |t|

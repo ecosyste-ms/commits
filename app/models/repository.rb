@@ -113,10 +113,7 @@ class Repository < ApplicationRecord
   end
 
   def sync_async(remote_ip = '0.0.0.0')
-    job = Job.new(url: html_url, status: 'pending', ip: remote_ip)
-    if job.save
-      job.parse_commits_async
-    end
+    SyncRepositoryWorker.perform_async(id)
   end
 
   def sync_details
@@ -263,25 +260,32 @@ class Repository < ApplicationRecord
   end
 
   def sync_all(force: false)
-    return if should_skip_sync?
+    # TEMPORARILY DISABLED - all skipping disabled to ensure repos get synced
+    # if should_skip_sync?
+    #   Rails.logger.info "Skipping sync for #{full_name} - should_skip_sync returned true"
+    #   return
+    # end
     
-    # Force sync if repository was last synced before multi-line commit message fix
-    if !force && last_synced_at.present? && last_synced_at < MULTILINE_FIX_TIME
-      puts "Forcing full sync for #{full_name} due to multi-line commit message fix"
+    # Automatically force sync if repository was last synced before multi-line commit message fix
+    if last_synced_at.present? && last_synced_at < MULTILINE_FIX_TIME
+      Rails.logger.info "Forcing full sync for #{full_name} due to multi-line commit message fix"
       force = true
     end
     
     last_commit = fetch_head_sha
     
-    # Skip early return checks if force is true
-    unless force
-      if !past_year_committers.nil? && last_synced_commit == last_commit && commits_count > 0
-        update(last_synced_at: Time.now)
-        return
-      end
-    end
+    # TEMPORARILY DISABLED - all skipping disabled to ensure repos get synced
+    # # If NOT forcing, check if we can skip
+    # if !force
+    #   # Skip if already up to date
+    #   if !past_year_committers.nil? && last_synced_commit == last_commit && commits_count > 0
+    #     Rails.logger.info "Skipping sync for #{full_name} - already up to date (#{last_synced_commit})"
+    #     update(last_synced_at: Time.now)
+    #     return
+    #   end
+    # end
     
-    # Clear existing commits if force is true
+    # If forcing, clear existing data
     if force
       commits.delete_all
       update_columns(last_synced_commit: nil, total_commits: 0)
@@ -321,39 +325,6 @@ class Repository < ApplicationRecord
     end
   end
 
-  def count_commits
-    sync_details
-    return if too_large?
-    return if status == 'not_found'
-    
-    last_commit = fetch_head_sha
-    if !past_year_committers.nil? && last_synced_commit == last_commit && commits_count > 0
-      update(last_synced_at: Time.now)
-      return
-    end
-    
-    begin
-      Dir.mktmpdir do |dir|
-        begin
-          Timeout.timeout(60) { clone_repository(dir) }
-        rescue Timeout::Error
-          raise TimeoutError, "Clone timed out for #{full_name} after 60 seconds"
-        end
-        repo_dir = File.join(dir, "repo")
-        counts = count_commits_internal(repo_dir)
-        update(counts)
-
-        if committers
-          fetch_all_logins
-          create_committer_join_records
-        end
-      end
-    rescue => e
-      self.status = 'too_large' if e.message.include?('timed out') || e.message.include?('too many committers')
-      self.save
-      puts "Error counting commits for #{full_name}: #{e}"
-    end
-  end
 
   def count_commits_internal(dir)
     # First check if this is a git repository

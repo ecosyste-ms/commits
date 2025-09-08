@@ -1,1 +1,0 @@
-json.extract! @job, :id, :url, :status, :results, :created_at, :updated_at, :sidekiq_id
