@@ -459,7 +459,7 @@ class Repository < ApplicationRecord
       return login
     end
 
-    existing_login = host.committers.email(email).first.try(:login)
+    existing_login = Committer.email(email).first.try(:login)
     return existing_login if existing_login
     # TODO should be host agnostic
     commit = api_client.list_commits(full_name, author: email, per_page: 1).first
