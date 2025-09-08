@@ -181,6 +181,11 @@ class Repository < ApplicationRecord
     Open3.capture3(git_env_no_prompt, 'git', *args)
   end
 
+  def default_branch
+    # Use stored default_branch if available, fallback to HEAD
+    super.present? ? super : 'HEAD'
+  end
+
   def fetch_head_sha
     output, error, status = git_command('ls-remote', git_clone_url, default_branch)
     return nil unless status.success?
