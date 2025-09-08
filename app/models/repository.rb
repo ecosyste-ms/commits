@@ -396,7 +396,9 @@ class Repository < ApplicationRecord
       # Remove null characters from name and email
       name = name.strip.gsub("\u0000", '') if name
       email = email.gsub("\u0000", '') if email
-      login = fetch_existing_login(email)
+      # TEMPORARILY DISABLED - fetch_existing_login is slow
+      # login = fetch_existing_login(email)
+      login = nil
       { name: name, email: email, login: login, count: count.to_i }
     end
 
