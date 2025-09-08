@@ -21,7 +21,7 @@ class CommittersController < ApplicationController
     @host = find_host_with_redirect(params[:host_id])
     return if performed?
     
-    @committer = Committer.find_by_login(params[:id])
+    @committer = @host.committers.find_by(login: params[:id])
     if @committer.nil?
       @committer = Committer.email(params[:id]).first 
       if @committer && @committer.login.present?
