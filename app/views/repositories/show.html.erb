@@ -132,10 +132,7 @@
   <% else %>
     <p class="card-subtitle mb-2 text-muted"><i><small>
         This repository has not been synced yet.
-
-        <% if @job && @job.in_progress? %>
-          <meta http-equiv=refresh content="3; url=<%= request.url %>">
-        <% end %>
+        <meta http-equiv=refresh content="3; url=<%= request.url %>">
     </small></i></p>
   <% end %>
 
