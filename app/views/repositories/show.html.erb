@@ -23,8 +23,8 @@
             Total Committers: <%= number_with_delimiter @repository.total_committers %><br>
             Total Bot Commits: <%= number_with_delimiter @repository.total_bot_commits %><br>
             Total Bot Committers: <%= number_with_delimiter @repository.total_bot_committers %><br>
-            Avg Commits per committer: <%= number_with_delimiter @repository.mean_commits.round(3) %><br>
-            Development Distribution Score (<a href='https://report.opensustain.tech/chapters/development-distribution-score.html' target="_blank">DDS</a>): <%= @repository.dds.round(3) %>
+            Avg Commits per committer: <%= @repository.mean_commits ? number_with_delimiter(@repository.mean_commits.round(3)) : 'N/A' %><br>
+            Development Distribution Score (<a href='https://report.opensustain.tech/chapters/development-distribution-score.html' target="_blank">DDS</a>): <%= @repository.dds ? @repository.dds.round(3) : 'N/A' %>
         </div>
         <% if @repository.past_year_committers %>
           <div class='col-md-6'>
@@ -32,8 +32,8 @@
             Committers in the past year: <%= number_with_delimiter @repository.past_year_total_committers %><br>
             Bot Commits in the past year: <%= number_with_delimiter @repository.past_year_total_bot_commits %><br>
             Bot Committers in the past year: <%= number_with_delimiter @repository.past_year_total_bot_committers %><br>
-            Avg Commits per committer in the past year: <%= number_with_delimiter @repository.past_year_mean_commits.round(3) %><br>
-            Development Distribution Score (<a href='https://report.opensustain.tech/chapters/development-distribution-score.html' target="_blank">DDS</a>) in the past year: <%= @repository.past_year_dds.round(3) %>
+            Avg Commits per committer in the past year: <%= @repository.past_year_mean_commits ? number_with_delimiter(@repository.past_year_mean_commits.round(3)) : 'N/A' %><br>
+            Development Distribution Score (<a href='https://report.opensustain.tech/chapters/development-distribution-score.html' target="_blank">DDS</a>) in the past year: <%= @repository.past_year_dds ? @repository.past_year_dds.round(3) : 'N/A' %>
           </div>
         <% end %>
       </div>
