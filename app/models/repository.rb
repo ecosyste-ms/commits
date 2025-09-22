@@ -71,6 +71,7 @@ class Repository < ApplicationRecord
       f.request :retry
       f.response :json
       f.headers['User-Agent'] = 'commits.ecosyste.ms'
+      f.headers['X-API-Key'] = ENV['ECOSYSTEMS_API_KEY'] if ENV['ECOSYSTEMS_API_KEY']
     end
     
     response = conn.get("api/v1/repositories/lookup?url=#{CGI.escape(url)}")

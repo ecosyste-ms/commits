@@ -58,6 +58,7 @@ class Host < ApplicationRecord
       f.request :retry
       f.response :json
       f.headers['User-Agent'] = 'commits.ecosyste.ms'
+      f.headers['X-API-Key'] = ENV['ECOSYSTEMS_API_KEY'] if ENV['ECOSYSTEMS_API_KEY']
     end
     
     response = conn.get('/api/v1/hosts/' + name + '/repositories')
@@ -88,6 +89,7 @@ class Host < ApplicationRecord
       f.request :retry
       f.response :json
       f.headers['User-Agent'] = 'commits.ecosyste.ms'
+      f.headers['X-API-Key'] = ENV['ECOSYSTEMS_API_KEY'] if ENV['ECOSYSTEMS_API_KEY']
     end
     
     response = conn.get('/api/v1/hosts')
