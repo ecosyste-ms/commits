@@ -15,4 +15,5 @@ coverage/
 .LSOverride
 
 data/
+*.dump
 .ruby-lsp
