@@ -48,6 +48,7 @@ WORKDIR $APP_ROOT
 # Install runtime dependencies
 RUN apk add --no-cache \
     bash \
+    git \
     nodejs \
     postgresql-libs \
     tzdata \
