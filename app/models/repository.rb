@@ -312,10 +312,10 @@ class Repository < ApplicationRecord
         
         # Handle committers
         # TEMPORARILY DISABLED - committer lookups are slow despite index
-        # if committers
-        #   fetch_all_logins
-        #   create_committer_join_records
-        # end
+        if committers
+          fetch_all_logins
+          create_committer_join_records
+        end
       end
     rescue => e
       self.status = 'too_large' if e.message.include?('timed out') || e.message.include?('too many committers')
