@@ -68,9 +68,23 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
   def show
     @host = find_host_with_redirect(params[:host_id])
     return if performed?
-    
+
     @repository = @host.repositories.find_by!('lower(full_name) = ?', params[:id].downcase)
     fresh_when @repository, public: true
+
+    # Load hidden committers for this repository in one query
+    hidden_committer_list = @repository.committer_list.where(hidden: true)
+    hidden_logins = Set.new(hidden_committer_list.map(&:login).compact)
+    hidden_emails = Set.new(hidden_committer_list.flat_map(&:emails))
+
+    # Filter committers
+    @committers = (@repository.committers || []).reject do |c|
+      hidden_logins.include?(c['login']) || hidden_emails.include?(c['email'])
+    end
+
+    @past_year_committers = (@repository.past_year_committers || []).reject do |c|
+      hidden_logins.include?(c['login']) || hidden_emails.include?(c['email'])
+    end
   end
 
   def ping

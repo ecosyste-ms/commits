@@ -71,4 +71,64 @@ class ApiV1RepositoriesControllerTest < ActionDispatch::IntegrationTest
     get api_v1_repositories_lookup_path(url: 'git@github.com:')
     assert_response :not_found
   end
+
+  test 'API hides committers where hidden is true' do
+    repo = create(:repository, :with_commits, host: @host, full_name: 'test/repo')
+
+    # Create committer records matching the JSON data
+    hidden_committer = create(:committer, host: @host, login: "johndoe", emails: ["john@example.com"], hidden: true)
+    visible_committer = create(:committer, host: @host, login: "janesmith", emails: ["jane@example.com"], hidden: false)
+
+    # Create contributions
+    create(:contribution, repository: repo, committer: hidden_committer, commit_count: 150)
+    create(:contribution, repository: repo, committer: visible_committer, commit_count: 100)
+
+    get api_v1_host_repository_path(host_id: @host.name, id: repo.full_name)
+    assert_response :success
+
+    actual_response = JSON.parse(@response.body)
+
+    # Check that hidden committer is not in the response
+    assert_not_includes actual_response['committers'].map { |c| c['login'] }, "johndoe"
+    # Check that visible committer is in the response
+    assert_includes actual_response['committers'].map { |c| c['login'] }, "janesmith"
+  end
+
+  test 'API hides committers by email when login is not present' do
+    repo = create(:repository, :with_commits, host: @host, full_name: 'test/repo2')
+
+    # Create a committer without login
+    hidden_committer = create(:committer, host: @host, login: nil, emails: ["john@example.com"], hidden: true)
+    create(:contribution, repository: repo, committer: hidden_committer, commit_count: 150)
+
+    get api_v1_host_repository_path(host_id: @host.name, id: repo.full_name)
+    assert_response :success
+
+    actual_response = JSON.parse(@response.body)
+
+    # Check that hidden committer is not in the response
+    assert_not_includes actual_response['committers'].map { |c| c['email'] }, "john@example.com"
+  end
+
+  test 'API hides past year committers where hidden is true' do
+    repo = create(:repository, :with_past_year_commits, host: @host, full_name: 'test/repo3')
+
+    # Create committer records matching the JSON data
+    hidden_committer = create(:committer, host: @host, login: "johndoe", emails: ["john@example.com"], hidden: true)
+    visible_committer = create(:committer, host: @host, login: "janesmith", emails: ["jane@example.com"], hidden: false)
+
+    # Create contributions
+    create(:contribution, repository: repo, committer: hidden_committer, commit_count: 80)
+    create(:contribution, repository: repo, committer: visible_committer, commit_count: 60)
+
+    get api_v1_host_repository_path(host_id: @host.name, id: repo.full_name)
+    assert_response :success
+
+    actual_response = JSON.parse(@response.body)
+
+    # Check that hidden committer is not in the response
+    assert_not_includes actual_response['past_year_committers'].map { |c| c['login'] }, "johndoe"
+    # Check that visible committer is in the response
+    assert_includes actual_response['past_year_committers'].map { |c| c['login'] }, "janesmith"
+  end
 end
