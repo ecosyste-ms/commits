@@ -312,7 +312,6 @@ class Repository < ApplicationRecord
         sync_commits_batch(repo_dir, force: force)
         
         # Handle committers
-        # TEMPORARILY DISABLED - committer lookups are slow despite index
         if committers
           fetch_all_logins
           create_committer_join_records
