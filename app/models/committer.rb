@@ -1,6 +1,7 @@
 class Committer < ApplicationRecord
   belongs_to :host
   scope :email, ->(email) { where("emails @> ARRAY[?]::varchar[]", email) }
+  scope :visible, -> { where(hidden: false) }
 
   has_many :contributions, dependent: :destroy
 

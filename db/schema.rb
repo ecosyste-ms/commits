@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.0].define(version: 2025_09_08_094259) do
+ActiveRecord::Schema[8.0].define(version: 2025_10_21_153431) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -38,6 +38,7 @@ ActiveRecord::Schema[8.0].define(version: 2025_09_08_094259) do
     t.integer "commits_count", default: 0
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.boolean "hidden", default: false, null: false
     t.index ["emails"], name: "index_committers_on_emails", using: :gin
     t.index ["host_id", "login"], name: "index_committers_on_host_id_and_login"
   end

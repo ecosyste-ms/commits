@@ -96,6 +96,56 @@ class RepositoriesControllerTest < ActionDispatch::IntegrationTest
       assert_response :success
       assert response.headers["Cache-Control"].present?
     end
+
+    should "hide committers where hidden is true" do
+      # Create committer records matching the JSON data
+      hidden_committer = create(:committer, host: @host, login: "johndoe", emails: ["john@example.com"], hidden: true)
+      visible_committer = create(:committer, host: @host, login: "janesmith", emails: ["jane@example.com"], hidden: false)
+
+      # Create contributions
+      create(:contribution, repository: @repository, committer: hidden_committer, commit_count: 150)
+      create(:contribution, repository: @repository, committer: visible_committer, commit_count: 100)
+
+      get host_repository_path(host_id: @host.name, id: @repository.full_name)
+      assert_response :success
+
+      # Check that hidden committer is not in the response
+      assert_not_includes assigns(:committers).map { |c| c['login'] }, "johndoe"
+      # Check that visible committer is in the response
+      assert_includes assigns(:committers).map { |c| c['login'] }, "janesmith"
+    end
+
+    should "hide committers by email when login is not present" do
+      # Create a committer without login
+      hidden_committer = create(:committer, host: @host, login: nil, emails: ["john@example.com"], hidden: true)
+      create(:contribution, repository: @repository, committer: hidden_committer, commit_count: 150)
+
+      get host_repository_path(host_id: @host.name, id: @repository.full_name)
+      assert_response :success
+
+      # Check that hidden committer is not in the response
+      assert_not_includes assigns(:committers).map { |c| c['email'] }, "john@example.com"
+    end
+
+    should "hide past year committers where hidden is true" do
+      repo = create(:repository, :with_past_year_commits, host: @host, full_name: "test/repo")
+
+      # Create committer records matching the JSON data
+      hidden_committer = create(:committer, host: @host, login: "johndoe", emails: ["john@example.com"], hidden: true)
+      visible_committer = create(:committer, host: @host, login: "janesmith", emails: ["jane@example.com"], hidden: false)
+
+      # Create contributions
+      create(:contribution, repository: repo, committer: hidden_committer, commit_count: 80)
+      create(:contribution, repository: repo, committer: visible_committer, commit_count: 60)
+
+      get host_repository_path(host_id: @host.name, id: repo.full_name)
+      assert_response :success
+
+      # Check that hidden committer is not in the response
+      assert_not_includes assigns(:past_year_committers).map { |c| c['login'] }, "johndoe"
+      # Check that visible committer is in the response
+      assert_includes assigns(:past_year_committers).map { |c| c['login'] }, "janesmith"
+    end
   end
 
   context "GET #lookup" do

@@ -62,7 +62,7 @@
               </tr>
             </thead>
             <tbody>
-              <% (@repository.committers || []).each do |committer| %>
+              <% @committers.each do |committer| %>
                 <tr>
                   <td>
                     <%= link_to_unless committer['login'].blank?, committer['name'], @repository.committer_url(committer['login']) %>
@@ -95,7 +95,7 @@
                 </tr>
               </thead>
               <tbody>
-                <% @repository.past_year_committers.each do |committer| %>
+                <% @past_year_committers.each do |committer| %>
                   <tr>
                     <td>
                       <%= link_to_unless committer['login'].blank?, committer['name'], @repository.committer_url(committer['login']) %>

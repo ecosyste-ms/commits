@@ -10,6 +10,7 @@ class Repository < ApplicationRecord
 
   has_many :commits, dependent: :delete_all
   has_many :contributions, dependent: :delete_all
+  has_many :committer_list, through: :contributions, source: :committer
   # has_many :committers, through: :contributions
 
   validates :full_name, presence: true

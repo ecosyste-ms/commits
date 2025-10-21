@@ -42,13 +42,27 @@ class RepositoriesController < ApplicationController
   def show
     @host = find_host_with_redirect(params[:host_id])
     return if performed?
-    
+
     @repository = @host.repositories.find_by('lower(full_name) = ?', params[:id].downcase)
     fresh_when @repository, public: true
     if @repository.nil?
       @job = @host.sync_repository_async(params[:id], request.remote_ip)
       @repository = @host.repositories.find_by('lower(full_name) = ?', params[:id].downcase)
       raise ActiveRecord::RecordNotFound unless @repository
+    end
+
+    # Load hidden committers for this repository in one query
+    hidden_committer_list = @repository.committer_list.where(hidden: true)
+    hidden_logins = Set.new(hidden_committer_list.map(&:login).compact)
+    hidden_emails = Set.new(hidden_committer_list.flat_map(&:emails))
+
+    # Filter committers
+    @committers = (@repository.committers || []).reject do |c|
+      hidden_logins.include?(c['login']) || hidden_emails.include?(c['email'])
+    end
+
+    @past_year_committers = (@repository.past_year_committers || []).reject do |c|
+      hidden_logins.include?(c['login']) || hidden_emails.include?(c['email'])
     end
   end
 
