@@ -103,6 +103,8 @@ module HostRedirect
       when 'show'
         host_owner_path(host.name, params[:id])
       end
+    when 'commits'
+      host_repository_commits_path(host.name, params[:repository_id])
     else
       # Fallback for other controllers
       raise "Unknown web controller: #{controller_name}"

@@ -56,16 +56,22 @@ class CommitsControllerTest < ActionDispatch::IntegrationTest
 
   test "should display co-authors and signed-off-by when present" do
     message_with_metadata = "Fix critical bug\n\nCo-authored-by: Jane Doe <jane@example.com>\nCo-authored-by: Bob Smith <bob@example.com>\nSigned-off-by: Alice Johnson <alice@example.com>"
-    
-    create(:commit, 
+
+    create(:commit,
       repository: @repository,
       message: message_with_metadata,
       timestamp: 1.hour.ago
     )
-    
+
     get host_repository_commits_url(@host, @repository)
     assert_response :success
     assert_select "small.text-muted", text: /Co-authored-by:/
     assert_select "small.text-muted", text: /Signed-off-by:/
+  end
+
+  test "should redirect from uppercase host to lowercase" do
+    get "/hosts/#{@host.name.upcase}/repositories/#{@repository.full_name}/commits"
+    assert_redirected_to host_repository_commits_path(@host.name, @repository.full_name)
+    assert_response :moved_permanently
   end
 end
