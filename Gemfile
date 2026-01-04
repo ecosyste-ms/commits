@@ -26,7 +26,6 @@ gem "faraday-multipart"
 gem 'faraday-net_http_persistent'
 gem "pagy", "~> 9.4.0"
 gem "pghero"
-gem "pg_query"
 gem 'bootstrap'
 gem 'rack-cors'
 gem 'rswag-api'
@@ -39,7 +38,6 @@ gem 'sidekiq-unique-jobs'
 gem 'addressable'
 gem 'appsignal'
 gem "groupdate"
-gem 'google-protobuf'
 gem 'octokit'
 gem 'redis'
 gem 'rugged'
@@ -61,6 +59,7 @@ group :test do
   gem "mocha"
   gem "rails-controller-testing"
   gem "factory_bot_rails"
+  gem "minitest", "~> 5.0"
 end
 
 gem "bootstrap-icons", "~> 1.0", require: "bootstrap_icons"
