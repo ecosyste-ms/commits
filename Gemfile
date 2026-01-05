@@ -59,7 +59,7 @@ group :test do
   gem "mocha"
   gem "rails-controller-testing"
   gem "factory_bot_rails"
-  gem "minitest", "~> 5.0"
+  gem "minitest", "~> 6.0"
 end
 
 gem "bootstrap-icons", "~> 1.0", require: "bootstrap_icons"
