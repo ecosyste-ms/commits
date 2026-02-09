@@ -90,7 +90,7 @@ class OwnersControllerTest < ActionDispatch::IntegrationTest
       assert_response :success
       assert response.headers["Cache-Control"].present?
       assert_match "public", response.headers["Cache-Control"]
-      assert_match "max-age=604800", response.headers["Cache-Control"]
+      assert_match "s-maxage=21600", response.headers["Cache-Control"]
     end
   end
 

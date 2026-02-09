@@ -30,7 +30,6 @@ class CommittersController < ApplicationController
     end
     raise ActiveRecord::RecordNotFound unless @committer
 
-    expires_in 1.week, public: true
     @pagy, @contributions = pagy_countless(@committer.contributions.includes(:repository).order('commit_count desc'))
   end
 end

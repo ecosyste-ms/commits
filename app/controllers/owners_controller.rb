@@ -6,7 +6,6 @@ class OwnersController < ApplicationController
     
     scope = @host.repositories.visible.group(:owner).count.sort_by { |k, v| [-v, k] }
     @pagy, @owners = pagy_array(scope)
-    expires_in 1.week, public: true
   end
 
   def show
