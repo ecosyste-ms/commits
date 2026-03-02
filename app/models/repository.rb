@@ -2,6 +2,18 @@ class Repository < ApplicationRecord
   class CloneError < StandardError; end
   class TimeoutError < StandardError; end
   class SyncError < StandardError; end
+
+  def self.sortable_columns
+    {
+      'last_synced_at' => 'last_synced_at',
+      'total_commits' => 'total_commits',
+      'total_committers' => 'total_committers',
+      'created_at' => 'created_at',
+      'updated_at' => 'updated_at',
+      'stargazers_count' => 'stargazers_count',
+      'full_name' => 'full_name',
+    }
+  end
   
   # Time when multi-line commit message fix was deployed
   MULTILINE_FIX_TIME = Time.parse('2025-09-05T21:42:32+01:00').freeze

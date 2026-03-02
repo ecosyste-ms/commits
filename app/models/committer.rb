@@ -1,4 +1,13 @@
 class Committer < ApplicationRecord
+  def self.sortable_columns
+    {
+      'commits_count' => 'commits_count',
+      'login' => 'login',
+      'updated_at' => 'updated_at',
+      'created_at' => 'created_at',
+    }
+  end
+
   belongs_to :host
   scope :email, ->(email) { where("emails @> ARRAY[?]::varchar[]", email) }
   scope :visible, -> { where(hidden: false) }
