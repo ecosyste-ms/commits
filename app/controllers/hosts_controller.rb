@@ -1,5 +1,5 @@
 class HostsController < ApplicationController
-  include HostRedirect
+  before_action :find_host_by_id, only: [:show]
 
   def index
     @hosts = Host.all.visible.order('repositories_count DESC, commits_count DESC').limit(20)
@@ -8,9 +8,8 @@ class HostsController < ApplicationController
   end
 
   def show
-    @host = find_host_with_redirect(params[:id])
     return if performed?
-    
+
     fresh_when @host, public: true
     scope = @host.repositories.visible
 

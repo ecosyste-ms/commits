@@ -73,6 +73,48 @@ class HostTest < ActiveSupport::TestCase
     end
   end
 
+  context 'find_by_name' do
+    should 'find host by exact name' do
+      host = Host.create!(name: 'GitHub', url: 'https://github.com', kind: 'github')
+      assert_equal host, Host.find_by_name('GitHub')
+    end
+
+    should 'find host case-insensitively' do
+      host = Host.create!(name: 'GitHub', url: 'https://github.com', kind: 'github')
+      assert_equal host, Host.find_by_name('github')
+      assert_equal host, Host.find_by_name('GITHUB')
+    end
+
+    should 'fall back to domain lookup' do
+      host = Host.create!(name: 'GitHub', url: 'https://github.com', kind: 'github')
+      assert_equal host, Host.find_by_name('github.com')
+    end
+
+    should 'return nil for blank name' do
+      assert_nil Host.find_by_name('')
+      assert_nil Host.find_by_name(nil)
+    end
+
+    should 'return nil for non-existent name' do
+      assert_nil Host.find_by_name('nonexistent')
+    end
+  end
+
+  context 'find_by_name!' do
+    should 'find host by name' do
+      host = Host.create!(name: 'GitHub', url: 'https://github.com', kind: 'github')
+      assert_equal host, Host.find_by_name!('GitHub')
+    end
+
+    should 'raise RecordNotFound for non-existent name' do
+      assert_raises(ActiveRecord::RecordNotFound) { Host.find_by_name!('nonexistent') }
+    end
+
+    should 'raise RecordNotFound for blank name' do
+      assert_raises(ActiveRecord::RecordNotFound) { Host.find_by_name!(nil) }
+    end
+  end
+
   context 'case insensitive uniqueness' do
     should 'not allow duplicate names with different cases' do
       host1 = Host.create!(name: 'github.com', url: 'https://github.com', kind: 'git')

@@ -1,17 +1,16 @@
 class OwnersController < ApplicationController
-  include HostRedirect
+  before_action :find_host
+
   def index
-    @host = find_host_with_redirect(params[:host_id])
     return if performed?
-    
+
     scope = @host.repositories.visible.group(:owner).count.sort_by { |k, v| [-v, k] }
     @pagy, @owners = pagy_array(scope)
   end
 
   def show
-    @host = find_host_with_redirect(params[:host_id])
     return if performed?
-    
+
     @owner = params[:id]
     scope = @host.repositories.owner(@owner).visible
 

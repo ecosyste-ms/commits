@@ -1,5 +1,5 @@
 class RepositoriesController < ApplicationController
-  include HostRedirect
+  before_action :find_host, only: [:show, :index]
   skip_before_action :set_cache_headers, only: [:lookup]
 
   def lookup
@@ -42,7 +42,6 @@ class RepositoriesController < ApplicationController
   end
 
   def show
-    @host = find_host_with_redirect(params[:host_id])
     return if performed?
 
     @repository = @host.repositories.find_by('lower(full_name) = ?', params[:id].downcase)
@@ -69,9 +68,8 @@ class RepositoriesController < ApplicationController
   end
 
   def index
-    @host = find_host_with_redirect(params[:host_id])
     return if performed?
-    
+
     redirect_to host_path(@host)
   end
 end

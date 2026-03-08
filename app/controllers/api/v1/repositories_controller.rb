@@ -1,12 +1,11 @@
 class Api::V1::RepositoriesController < Api::V1::ApplicationController
-  include HostRedirect
+  before_action :find_host, only: [:index, :show, :ping]
   skip_before_action :set_cache_headers, only: [:lookup, :ping]
   skip_before_action :set_api_cache_headers, only: [:lookup, :ping]
 
   def index
-    @host = find_host_with_redirect(params[:host_id])
     return if performed?
-    
+
     scope = @host.repositories.visible.order('last_synced_at DESC').includes(:host)
     scope = scope.created_after(params[:created_after]) if params[:created_after].present?
     scope = scope.updated_after(params[:updated_after]) if params[:updated_after].present?
@@ -34,7 +33,7 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
       # Handle SSH format like git@github.com:user/repo.git
       parts = url.split(':', 2)
       raise ActiveRecord::RecordNotFound unless parts.length == 2 && parts[1].present?
-      
+
       user_host, repo_path = parts
       host = user_host.split('@').last
       path = repo_path.delete_suffix('.git').chomp('/')
@@ -68,7 +67,6 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
   end
 
   def show
-    @host = find_host_with_redirect(params[:host_id])
     return if performed?
 
     @repository = @host.repositories.find_by!('lower(full_name) = ?', params[:id].downcase)
@@ -90,16 +88,15 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
   end
 
   def ping
-    @host = find_host_with_redirect(params[:host_id])
     return if performed?
-    
+
     @repository = Repository.find_or_create_from_host(@host, params[:id])
-    
+
     # Skip if recently synced
     if @repository.last_synced_at.blank? || @repository.last_synced_at < 1.day.ago
       @repository.sync_async(request.remote_ip)
     end
-    
+
     render json: { message: 'pong' }
   end
 

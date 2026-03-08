@@ -1,9 +1,9 @@
 class CommittersController < ApplicationController
-  include HostRedirect
+  before_action :find_host
+
   def index
-    @host = find_host_with_redirect(params[:host_id])
     return if performed?
-    
+
     scope = @host.committers.where('commits_count > 0')
 
     sort = sanitize_sort(Committer.sortable_columns)
@@ -18,12 +18,11 @@ class CommittersController < ApplicationController
   end
 
   def show
-    @host = find_host_with_redirect(params[:host_id])
     return if performed?
-    
+
     @committer = @host.committers.find_by(login: params[:id])
     if @committer.nil?
-      @committer = Committer.email(params[:id]).first 
+      @committer = Committer.email(params[:id]).first
       if @committer && @committer.login.present?
         redirect_to host_committer_path(@host, @committer), status: :moved_permanently
       end
