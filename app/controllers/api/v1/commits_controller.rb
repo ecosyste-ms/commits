@@ -2,8 +2,6 @@ class Api::V1::CommitsController < Api::V1::ApplicationController
   before_action :find_host
 
   def index
-    return if performed?
-
     @repository = @host.repositories.find_by!('lower(full_name) = ?', params[:repository_id].downcase)
 
     scope = @repository.commits.order('timestamp DESC')

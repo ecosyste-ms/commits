@@ -8,8 +8,6 @@ class HostsController < ApplicationController
   end
 
   def show
-    return if performed?
-
     fresh_when @host, public: true
     scope = @host.repositories.visible
 

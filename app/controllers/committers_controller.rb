@@ -2,8 +2,6 @@ class CommittersController < ApplicationController
   before_action :find_host
 
   def index
-    return if performed?
-
     scope = @host.committers.where('commits_count > 0')
 
     sort = sanitize_sort(Committer.sortable_columns)
@@ -18,8 +16,6 @@ class CommittersController < ApplicationController
   end
 
   def show
-    return if performed?
-
     @committer = @host.committers.find_by(login: params[:id])
     if @committer.nil?
       @committer = Committer.email(params[:id]).first

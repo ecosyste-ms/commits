@@ -2,8 +2,6 @@ class Api::V1::CommittersController < Api::V1::ApplicationController
   before_action :find_host
 
   def show
-    return if performed?
-
     @committer = @host.committers.find_by(login: params[:id])
     if @committer.nil?
       @committer = Committer.email(params[:id]).first

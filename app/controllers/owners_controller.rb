@@ -2,15 +2,11 @@ class OwnersController < ApplicationController
   before_action :find_host
 
   def index
-    return if performed?
-
     scope = @host.repositories.visible.group(:owner).count.sort_by { |k, v| [-v, k] }
     @pagy, @owners = pagy_array(scope)
   end
 
   def show
-    return if performed?
-
     @owner = params[:id]
     scope = @host.repositories.owner(@owner).visible
 

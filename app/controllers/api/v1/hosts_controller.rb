@@ -7,8 +7,6 @@ class Api::V1::HostsController < Api::V1::ApplicationController
   end
 
   def show
-    return if performed?
-
     fresh_when @host, public: true
   end
 end

@@ -42,8 +42,6 @@ class RepositoriesController < ApplicationController
   end
 
   def show
-    return if performed?
-
     @repository = @host.repositories.find_by('lower(full_name) = ?', params[:id].downcase)
     fresh_when @repository, public: true
     if @repository.nil?
@@ -68,8 +66,6 @@ class RepositoriesController < ApplicationController
   end
 
   def index
-    return if performed?
-
     redirect_to host_path(@host)
   end
 end

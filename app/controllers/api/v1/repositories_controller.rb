@@ -4,8 +4,6 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
   skip_before_action :set_api_cache_headers, only: [:lookup, :ping]
 
   def index
-    return if performed?
-
     scope = @host.repositories.visible.order('last_synced_at DESC').includes(:host)
     scope = scope.created_after(params[:created_after]) if params[:created_after].present?
     scope = scope.updated_after(params[:updated_after]) if params[:updated_after].present?
@@ -67,8 +65,6 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
   end
 
   def show
-    return if performed?
-
     @repository = @host.repositories.find_by!('lower(full_name) = ?', params[:id].downcase)
     fresh_when @repository, public: true
 
@@ -88,8 +84,6 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
   end
 
   def ping
-    return if performed?
-
     @repository = Repository.find_or_create_from_host(@host, params[:id])
 
     # Skip if recently synced
