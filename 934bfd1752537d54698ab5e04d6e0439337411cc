@@ -1,0 +1,21 @@
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "934bfd1752537d54698ab5e04d6e0439337411cc",
+  "prompts": {
+    "81b71850e60824e5": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "f7001e13-a462-43a7-8943-9e6ae06e2a4b",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Andrew Nesbitt <andrewnez@gmail.com>",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 14,
+      "accepted_lines": 0,
+      "overriden_lines": 0
+    }
+  }
+}
