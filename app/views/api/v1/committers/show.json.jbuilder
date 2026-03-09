@@ -1,1 +1,1 @@
-json.extract @committer, :id, :login, :emails, :commits_count, :created_at, :updated_at, :repositories_count
+json.extract! @committer, :id, :login, :emails, :commits_count, :created_at, :updated_at, :repositories_count

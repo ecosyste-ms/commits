@@ -13,6 +13,7 @@ class Committer < ApplicationRecord
   scope :visible, -> { where(hidden: false) }
 
   has_many :contributions, dependent: :destroy
+  has_many :repositories, through: :contributions
 
   def to_s
     login || emails.first
@@ -27,16 +28,8 @@ class Committer < ApplicationRecord
     "#{host.url}/#{login}"
   end
 
-  def repositories
-    if login.present?
-      host.repositories.committer_login_or_email(login, emails.first)
-    else
-      host.repositories.committer_email(emails.first)
-    end
-  end
-
   def repositories_count
-    repositories.count
+    contributions.count
   end
 
   def update_commits_count

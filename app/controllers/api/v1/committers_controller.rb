@@ -10,6 +10,6 @@ class Api::V1::CommittersController < Api::V1::ApplicationController
       end
     end
     raise ActiveRecord::RecordNotFound unless @committer
-    @pagy, @repositories = pagy_countless(@committer.repositories)
+    @pagy, @contributions = pagy_countless(@committer.contributions.includes(:repository).order('commit_count desc'))
   end
 end
