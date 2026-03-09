@@ -236,6 +236,30 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Commit"
+  /hosts/{hostName}/committers/{login}:
+    get:
+      summary: get a committer from a host
+      operationId: getHostCommitter
+      parameters:
+        - in: path
+          name: hostName
+          schema:
+            type: string
+          required: true
+          description: name of host
+        - in: path
+          name: login
+          schema:
+            type: string
+          required: true
+          description: login or email of committer
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Committer"
 components:
   schemas:
     Host:
@@ -332,3 +356,35 @@ components:
           type: boolean
         html_url:
           type: string
+    Committer:
+      type: object
+      properties:
+        id:
+          type: integer
+        login:
+          type: string
+        emails:
+          type: array
+          items:
+            type: string
+        commits_count:
+          type: integer
+        repositories_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        repositories:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: integer
+              full_name:
+                type: string
+              commit_count:
+                type: integer
