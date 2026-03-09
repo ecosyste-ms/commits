@@ -1,0 +1,27 @@
+test/controllers/api/v1/committers_controller_test.rb
+  aff98d7ef1c6e966 27-37
+openapi/api/v1/openapi.yaml
+  aff98d7ef1c6e966 239-262,359-390
+app/views/api/v1/committers/show.json.jbuilder
+  aff98d7ef1c6e966 2-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.8",
+  "base_commit_sha": "e4f793b4e9754ff185014fcd2be38ebf1f23436a",
+  "prompts": {
+    "aff98d7ef1c6e966": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "8a570894-41b3-48b5-b6ed-8b91efe4fccc",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Andrew Nesbitt <andrewnez@gmail.com>",
+      "messages": [],
+      "total_additions": 73,
+      "total_deletions": 1,
+      "accepted_lines": 72,
+      "overriden_lines": 0
+    }
+  }
+}
