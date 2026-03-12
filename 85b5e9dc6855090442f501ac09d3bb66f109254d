@@ -1,0 +1,23 @@
+config/initializers/cors.rb
+  b79073c154fdcf36 1-6
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.10",
+  "base_commit_sha": "85b5e9dc6855090442f501ac09d3bb66f109254d",
+  "prompts": {
+    "b79073c154fdcf36": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "b6bd8bde-a226-4b58-9b5d-f06cc22d9e55",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Andrew Nesbitt <andrewnez@gmail.com>",
+      "messages": [],
+      "total_additions": 6,
+      "total_deletions": 0,
+      "accepted_lines": 6,
+      "overriden_lines": 0
+    }
+  }
+}
