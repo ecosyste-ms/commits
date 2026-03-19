@@ -1,0 +1,25 @@
+app/controllers/owners_controller.rb
+  95007e9b38ea4fe7 5,7
+test/controllers/owners_controller_test.rb
+  95007e9b38ea4fe7 88-94
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.15",
+  "base_commit_sha": "2556cc1e1194ded6871afd3e602e24a958ff9f00",
+  "prompts": {
+    "95007e9b38ea4fe7": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "ecb0e121-b896-4344-9da7-800056fe1234",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Andrew Nesbitt <andrewnez@gmail.com>",
+      "messages": [],
+      "total_additions": 9,
+      "total_deletions": 1,
+      "accepted_lines": 9,
+      "overriden_lines": 0
+    }
+  }
+}
