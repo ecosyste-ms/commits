@@ -85,6 +85,13 @@ class OwnersControllerTest < ActionDispatch::IntegrationTest
       assert_match "special-owner_123", response.body
     end
 
+    should "handle repositories with nil owner" do
+      create(:repository, :with_commits, host: @host, owner: nil, full_name: "no-owner/repo")
+
+      get host_owners_path(@host.name)
+      assert_response :success
+    end
+
     should "set proper cache headers" do
       get host_owners_path(@host.name)
       assert_response :success

@@ -2,8 +2,9 @@ class OwnersController < ApplicationController
   before_action :find_host
 
   def index
-    scope = @host.repositories.visible.group(:owner).count.sort_by { |k, v| [-v, k] }
+    scope = @host.repositories.visible.group(:owner).count.sort_by { |k, v| [-v, k.to_s] }
     @pagy, @owners = pagy_array(scope)
+    @owners ||= []
   end
 
   def show
