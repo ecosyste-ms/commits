@@ -1,0 +1,49 @@
+test/controllers/owners_controller_test.rb
+  ccb6effe6ef0067c 102-109,196-201
+test/controllers/api/v1/repositories_controller_test.rb
+  ccb6effe6ef0067c 75-86
+app/controllers/api/v1/repositories_controller.rb
+  ccb6effe6ef0067c 56,70,90
+test/factories/owners.rb
+  ccb6effe6ef0067c 1-12
+db/migrate/20260325131003_create_owners.rb
+  ccb6effe6ef0067c 4-7,10-11
+test/models/owner_test.rb
+  ccb6effe6ef0067c 1-48
+app/models/host.rb
+  ccb6effe6ef0067c 4
+app/controllers/owners_controller.rb
+  ccb6effe6ef0067c 6,13-14
+test/models/repository_test.rb
+  ccb6effe6ef0067c 824-844
+app/views/owners/index.html.erb
+  ccb6effe6ef0067c 38
+app/models/owner.rb
+  ccb6effe6ef0067c 1-16
+test/controllers/repositories_controller_test.rb
+  ccb6effe6ef0067c 94-99
+app/models/repository.rb
+  ccb6effe6ef0067c 129-138
+app/controllers/repositories_controller.rb
+  ccb6effe6ef0067c 33,47-49
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.1.19",
+  "base_commit_sha": "96265b78c25b99df8e8adeada47d6823acf9b2e3",
+  "prompts": {
+    "ccb6effe6ef0067c": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "40761ab7-c590-46bc-822d-98d8e8e6c41a",
+        "model": "claude-opus-4-6"
+      },
+      "human_author": "Andrew Nesbitt <andrewnez@gmail.com>",
+      "messages": [],
+      "total_additions": 161,
+      "total_deletions": 4,
+      "accepted_lines": 158,
+      "overriden_lines": 0
+    }
+  }
+}
