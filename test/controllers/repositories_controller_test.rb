@@ -91,6 +91,12 @@ class RepositoriesControllerTest < ActionDispatch::IntegrationTest
       assert_response :success
     end
 
+    should "return 404 for repository with hidden owner" do
+      hidden_owner = create(:owner, host: @host, login: 'ecosyste-ms', hidden: true)
+      get host_repository_path(host_id: @host.name, id: @repository.full_name)
+      assert_response :not_found
+    end
+
     should "set proper cache headers" do
       get host_repository_path(host_id: @host.name, id: @repository.full_name)
       assert_response :success

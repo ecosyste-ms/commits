@@ -821,4 +821,25 @@ Co-authored-by: Claude <noreply@anthropic.com>" 2>&1`
       assert_equal({}, result)
     end
   end
+
+  context 'owner_hidden?' do
+    should 'return false when no owner record exists' do
+      assert_equal false, @repository.owner_hidden?
+    end
+
+    should 'return false for repository with visible owner' do
+      Owner.create!(host: @host, login: 'test', hidden: false)
+      assert_equal false, @repository.owner_hidden?
+    end
+
+    should 'return true for repository with hidden owner' do
+      Owner.create!(host: @host, login: 'test', hidden: true)
+      assert_equal true, @repository.owner_hidden?
+    end
+
+    should 'return false for repository with nil hidden owner' do
+      Owner.create!(host: @host, login: 'test', hidden: nil)
+      assert_equal false, @repository.owner_hidden?
+    end
+  end
 end

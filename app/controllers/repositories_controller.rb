@@ -30,6 +30,7 @@ class RepositoriesController < ApplicationController
     @repository = @host.repositories.find_by('lower(full_name) = ?', path.downcase)
 
     if @repository
+      raise ActiveRecord::RecordNotFound if @repository.owner_hidden?
       if @repository.last_synced_at.blank? || @repository.last_synced_at < 1.day.ago
         @repository.sync_async(request.remote_ip)
       end
@@ -43,6 +44,9 @@ class RepositoriesController < ApplicationController
 
   def show
     @repository = @host.repositories.find_by('lower(full_name) = ?', params[:id].downcase)
+    if @repository.present?
+      raise ActiveRecord::RecordNotFound if @repository.owner_hidden?
+    end
     fresh_when @repository, public: true
     if @repository.nil?
       @job = @host.sync_repository_async(params[:id], request.remote_ip)

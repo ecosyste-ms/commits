@@ -35,6 +35,7 @@
 
   <% @owners.each do |owner, count| %>
     <% next if owner.nil? %>
+    <% next if @hidden_owners.include?(owner) %>
     <div class="card mb-3">
       <div class="card-body">
         <h5 class="card-title">

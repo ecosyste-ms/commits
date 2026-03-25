@@ -72,6 +72,18 @@ class ApiV1RepositoriesControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test 'get a repository with hidden owner returns 404' do
+    Owner.create!(host: @host, login: 'ecosyste-ms', hidden: true)
+    get api_v1_host_repository_path(host_id: @host.name, id: @repository.full_name)
+    assert_response :not_found
+  end
+
+  test 'lookup a repository with hidden owner returns 404' do
+    Owner.create!(host: @host, login: 'ecosyste-ms', hidden: true)
+    get api_v1_repositories_lookup_path(url: 'https://github.com/ecosyste-ms/repos/')
+    assert_response :not_found
+  end
+
   test 'API hides committers where hidden is true' do
     repo = create(:repository, :with_commits, host: @host, full_name: 'test/repo')
 

@@ -53,6 +53,7 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
     @repository = @host.repositories.find_by('lower(full_name) = ?', path.downcase)
 
     if @repository
+      raise ActiveRecord::RecordNotFound if @repository.owner_hidden?
       if @repository.last_synced_at.blank? || @repository.last_synced_at < 1.day.ago
         @repository.sync_async(request.remote_ip)
       end
@@ -66,6 +67,7 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
 
   def show
     @repository = @host.repositories.find_by!('lower(full_name) = ?', params[:id].downcase)
+    raise ActiveRecord::RecordNotFound if @repository.owner_hidden?
     fresh_when @repository, public: true
 
     # Load hidden committers for this repository in one query
@@ -85,6 +87,7 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
 
   def ping
     @repository = Repository.find_or_create_from_host(@host, params[:id])
+    raise ActiveRecord::RecordNotFound if @repository&.owner_hidden?
 
     # Skip if recently synced
     if @repository.last_synced_at.blank? || @repository.last_synced_at < 1.day.ago

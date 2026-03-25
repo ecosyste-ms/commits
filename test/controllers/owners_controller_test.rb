@@ -99,6 +99,14 @@ class OwnersControllerTest < ActionDispatch::IntegrationTest
       assert_match "public", response.headers["Cache-Control"]
       assert_match "s-maxage=21600", response.headers["Cache-Control"]
     end
+
+    should "exclude hidden owners from index" do
+      create(:owner, host: @host, login: 'owner1', hidden: true)
+      get host_owners_path(@host.name)
+      assert_response :success
+      assert_no_match "owner1", response.body
+      assert_match "owner2", response.body
+    end
   end
 
   context "GET #show" do
@@ -183,6 +191,12 @@ class OwnersControllerTest < ActionDispatch::IntegrationTest
       assert_response :success
       assert_match visible_repo.full_name, response.body
       assert_no_match invisible_repo.full_name, response.body
+    end
+
+    should "return 404 for hidden owner" do
+      create(:owner, host: @host, login: 'owner1', hidden: true)
+      get host_owner_path(@host.name, "owner1")
+      assert_response :not_found
     end
 
     should "return 404 for non-existent host" do
