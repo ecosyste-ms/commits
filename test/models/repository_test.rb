@@ -842,4 +842,35 @@ Co-authored-by: Claude <noreply@anthropic.com>" 2>&1`
       assert_equal false, @repository.owner_hidden?
     end
   end
+
+  test "committer_records creates records for unknown committers with an email" do
+    @repository.update!(
+      committers: [
+        { "name" => "New Committer", "email" => "new@example.com", "login" => nil, "count" => 3 }
+      ]
+    )
+
+    record = @repository.committer_records.first
+    committer = @host.committers.find(record[:committer_id])
+
+    assert_equal ["new@example.com"], committer.emails
+    assert_nil committer.login
+    assert_equal 3, record[:commit_count]
+  end
+
+  test "committer_records creates records for unknown committers with a login" do
+    @repository.update!(
+      committers: [
+        { "name" => "New Committer", "email" => nil, "login" => "new-user", "count" => 7 }
+      ]
+    )
+
+    record = @repository.committer_records.first
+    committer = @host.committers.find(record[:committer_id])
+
+    assert_equal "new-user", committer.login
+    assert_empty committer.emails
+    assert_equal 7, record[:commit_count]
+  end
+
 end
