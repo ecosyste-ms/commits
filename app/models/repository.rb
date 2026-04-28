@@ -1513,9 +1513,11 @@ class Repository < ApplicationRecord
       next unless committer['login'].present? || committer['email'].present?
     
       c = host.committers.find_by(login: committer['login']) if committer['login'].present?
-      c ||= host.committers.email(committer['email']).first
-    
-      next unless c
+      c ||= host.committers.email(committer['email']).first if committer['email'].present?
+      c ||= host.committers.create!(
+        login: committer['login'].presence,
+        emails: Array(committer['email']).compact
+      )
     
       { committer_id: c.id, commit_count: committer['count'] }
     end.compact
