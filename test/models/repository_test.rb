@@ -761,6 +761,22 @@ Co-authored-by: Second <second@example.com>" 2>&1`
     end
   end
 
+
+
+  test "sync_all skips repositories over the size limit" do
+    @repository.update!(size: 600_001)
+    @repository.expects(:clone_repository).never
+    @repository.stubs(:fetch_head_sha).returns("abc123")
+    @repository.stubs(:sync_details).returns(nil)
+    @repository.stubs(:count_refs).returns(0)
+
+    @repository.sync_all
+
+    @repository.reload
+    assert_equal "too_large", @repository.status
+    assert_not_nil @repository.last_synced_at
+  end
+
   test "sync_all correctly uses repo subdirectory after cloning" do
     Dir.mktmpdir do |source_dir|
       `git init #{source_dir} 2>&1`
