@@ -843,3 +843,35 @@ Co-authored-by: Claude <noreply@anthropic.com>" 2>&1`
     end
   end
 end
+
+class RepositoryCommitterRecordsTest < ActiveSupport::TestCase
+  setup do
+    @host = Host.create!(name: "github.com", url: "https://github.com", kind: "github")
+    @repository = Repository.create!(host: @host, full_name: "test/repo", owner: "test")
+  end
+
+  test "committer_records creates committers without logins" do
+    @repository.committers = [
+      { "name" => "No Login", "email" => "NOLOGIN@example.com", "login" => nil, "count" => 3 }
+    ]
+
+    records = @repository.committer_records
+    committer = @host.committers.find_by(emails: ["nologin@example.com"])
+
+    assert_not_nil committer
+    assert_nil committer.login
+    assert_equal [{ committer_id: committer.id, commit_count: 3 }], records
+  end
+
+  test "committer_records creates committers with logins and merges emails" do
+    existing = @host.committers.create!(login: "octocat", emails: ["old@example.com"])
+    @repository.committers = [
+      { "name" => "Octo Cat", "email" => "new@example.com", "login" => "octocat", "count" => 2 }
+    ]
+
+    records = @repository.committer_records
+
+    assert_equal [{ committer_id: existing.id, commit_count: 2 }], records
+    assert_equal ["old@example.com", "new@example.com"], existing.reload.emails
+  end
+end
