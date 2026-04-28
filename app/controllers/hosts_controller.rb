@@ -3,8 +3,8 @@ class HostsController < ApplicationController
 
   def index
     @hosts = Host.all.visible.order('repositories_count DESC, commits_count DESC').limit(20)
-    fresh_when @hosts, public: true
     @repositories = Repository.visible.order('last_synced_at DESC').includes(:host).limit(25)
+    fresh_when @hosts, public: true
   end
 
   def show
@@ -19,5 +19,10 @@ class HostsController < ApplicationController
     end
 
     @pagy, @repositories = pagy_countless(scope)
+
+    respond_to do |format|
+      format.html
+      format.atom
+    end
   end
 end

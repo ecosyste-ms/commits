@@ -1,5 +1,8 @@
 <% @meta_title = "Repository Hosts" %>
 <% @meta_description = "List of repository hosts that have had their commit history parsed" %>
+<% content_for :head do %>
+  <%= auto_discovery_link_tag :atom, hosts_url(format: :atom), title: 'commits.ecosyste.ms hosts' %>
+<% end %>
 
 <div class="col-lg-4 container-sm text-center">
   <form class="row g-2 justify-content-center" action='<%= lookup_repositories_path %>' method="get">
