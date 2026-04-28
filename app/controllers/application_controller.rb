@@ -17,6 +17,10 @@ class ApplicationController < ActionController::Base
 
   def find_host_by_param(param_name)
     host_param = params[param_name]
+    if host_param.end_with?('.atom')
+      host_param = host_param.delete_suffix('.atom')
+      request.format = :atom
+    end
     @host = Host.find_by_name!(host_param)
     unless @host.name == host_param
       safe_params = request.query_parameters.except(:controller, :action, :host, :port, :protocol)

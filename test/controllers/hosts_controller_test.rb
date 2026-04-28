@@ -55,6 +55,23 @@ class HostsControllerTest < ActionDispatch::IntegrationTest
       assert_response :success
       assert_template 'hosts/index'
     end
+
+    should "include atom feed auto discovery link" do
+      get hosts_path
+
+      assert_response :success
+      assert_select "link[type='application/atom+xml'][href=?]", hosts_url(format: :atom)
+    end
+
+    should "render atom feed of recent repositories" do
+      repository = create(:repository, :with_commits, host: @host, full_name: "owner/feed", last_synced_at: 1.hour.ago)
+
+      get hosts_path(format: :atom)
+
+      assert_response :success
+      assert_equal 'application/atom+xml', response.media_type
+      assert_match repository.full_name, response.body
+    end
   end
 
   context "GET #show" do
@@ -77,6 +94,23 @@ class HostsControllerTest < ActionDispatch::IntegrationTest
       assert_response :success
       assert_match repo1.full_name, response.body
       assert_match repo2.full_name, response.body
+    end
+
+    should "include atom feed auto discovery link" do
+      get host_path(@host_with_repos.name)
+
+      assert_response :success
+      assert_select "link[type='application/atom+xml'][href=?]", host_url(@host_with_repos, format: :atom)
+    end
+
+    should "render atom feed of host repositories" do
+      repository = create(:repository, :with_commits, host: @host_with_repos, full_name: "owner/feed")
+
+      get host_path(@host_with_repos.name, format: :atom)
+
+      assert_response :success
+      assert_equal 'application/atom+xml', response.media_type
+      assert_match repository.full_name, response.body
     end
 
     should "only show visible repositories" do
