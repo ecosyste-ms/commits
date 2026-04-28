@@ -274,7 +274,10 @@ class Repository < ApplicationRecord
 
   def should_skip_sync?
     sync_details
-    return true if too_large?
+    if too_large?
+      update_columns(status: 'too_large', last_synced_at: Time.current)
+      return true
+    end
     if status == 'not_found'
       # Update last_synced_at even for not_found repos to avoid repeated attempts
       update_column(:last_synced_at, Time.now)
@@ -284,11 +287,10 @@ class Repository < ApplicationRecord
   end
 
   def sync_all(force: false)
-    # TEMPORARILY DISABLED - all skipping disabled to ensure repos get synced
-    # if should_skip_sync?
-    #   Rails.logger.info "Skipping sync for #{full_name} - should_skip_sync returned true"
-    #   return
-    # end
+    if should_skip_sync?
+      Rails.logger.info "Skipping sync for #{full_name} - should_skip_sync returned true"
+      return
+    end
     
     # Automatically force sync if repository was last synced before multi-line commit message fix
     if last_synced_at.present? && last_synced_at < MULTILINE_FIX_TIME
