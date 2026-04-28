@@ -1511,15 +1511,12 @@ class Repository < ApplicationRecord
     return [] if committers.nil?
     grouped_committers = committers.map do |committer|
       next unless committer['login'].present? || committer['email'].present?
-    
-      c = host.committers.find_by(login: committer['login']) if committer['login'].present?
-      c ||= host.committers.email(committer['email']).first
-    
-      next unless c
-    
+
+      c = find_or_create_committer_record(committer)
+
       { committer_id: c.id, commit_count: committer['count'] }
     end.compact
-    
+
     grouped_committers = grouped_committers.group_by { |c| c[:committer_id] }.map do |committer_id, records|
       {
         committer_id: committer_id,
@@ -1528,11 +1525,29 @@ class Repository < ApplicationRecord
     end
   end
 
+  def find_or_create_committer_record(committer)
+    email = committer['email'].presence&.downcase
+    login = committer['login'].presence
+
+    record = host.committers.find_by(login: login) if login
+    record ||= host.committers.email(email).first if email
+
+    if record
+      emails = Array(record.emails)
+      if email && !emails.include?(email)
+        record.update(emails: (emails + [email]).uniq)
+      end
+      return record
+    end
+
+    host.committers.create!(login: login, emails: Array(email).compact)
+  end
+
   def create_committer_join_records
     committer_records.each do |record|
-      Contribution.find_or_create_by(repository_id: id, committer_id: record[:committer_id]) do |contribution|
-        contribution.commit_count = record[:commit_count]
-      end
+      contribution = Contribution.find_or_initialize_by(repository_id: id, committer_id: record[:committer_id])
+      contribution.commit_count = record[:commit_count]
+      contribution.save!
     end
   end
 
