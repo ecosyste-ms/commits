@@ -140,4 +140,15 @@ class HostTest < ActiveSupport::TestCase
       assert_includes host2.errors[:name], 'has already been taken'
     end
   end
+
+  context 'sync_repository_async' do
+    should 'skip hidden owners' do
+      host = create(:host, :github)
+      create(:owner, host: host, login: 'gone', hidden: true)
+
+      assert_no_difference -> { host.repositories.count } do
+        assert_nil host.sync_repository_async('gone/repo')
+      end
+    end
+  end
 end

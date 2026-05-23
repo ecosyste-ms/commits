@@ -284,6 +284,7 @@ class Repository < ApplicationRecord
   end
 
   def sync_all(force: false)
+    return if owner_hidden?
     # TEMPORARILY DISABLED - all skipping disabled to ensure repos get synced
     # if should_skip_sync?
     #   Rails.logger.info "Skipping sync for #{full_name} - should_skip_sync returned true"

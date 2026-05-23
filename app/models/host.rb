@@ -58,7 +58,13 @@ class Host < ApplicationRecord
     status&.humanize || 'Unknown'
   end
 
+  def owner_hidden?(login)
+    return false if login.blank?
+    owners.where(hidden: true).where('lower(login) = ?', login.downcase).exists?
+  end
+
   def sync_repository_async(full_name, remote_ip = '0.0.0.0')
+    return nil if owner_hidden?(full_name.split('/').first)
     repo = Repository.find_or_create_from_host(self, full_name)
     repo.sync_async(remote_ip) if repo
     repo
