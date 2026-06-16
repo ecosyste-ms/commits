@@ -1,5 +1,5 @@
 class Api::V1::RepositoriesController < Api::V1::ApplicationController
-  before_action :find_host, only: [:index, :show, :ping]
+  before_action :find_host, only: [:index, :show, :ping, :chart_data]
   skip_before_action :set_cache_headers, only: [:lookup, :ping]
   skip_before_action :set_api_cache_headers, only: [:lookup, :ping]
 
@@ -95,6 +95,43 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
     end
 
     render json: { message: 'pong' }
+  end
+
+  def chart_data
+    @repository = @host.repositories.find_by!('lower(full_name) = ?', params[:id].downcase)
+    raise ActiveRecord::RecordNotFound if @repository.owner_hidden?
+
+    period = (params[:period].presence || 'month').to_sym
+    scope = @repository.commits
+    scope = scope.since(params[:start_date]) if params[:start_date].present?
+    scope = scope.until(params[:end_date]) if params[:end_date].present?
+
+    data = case params[:chart]
+           when 'commits'
+             scope.group_by_period(period, :timestamp).count
+           when 'committers'
+             scope.group_by_period(period, :timestamp).distinct.count(:author)
+           when 'average_commits_per_committer'
+             average_commits_per_committer(scope, period)
+           else
+             render json: { error: 'unknown chart' }, status: :bad_request
+             return
+           end
+
+    fresh_when @repository, public: true
+    render json: data
+  end
+
+  private
+
+  def average_commits_per_committer(scope, period)
+    commit_counts = scope.group_by_period(period, :timestamp).count
+    committer_counts = scope.group_by_period(period, :timestamp).distinct.count(:author)
+
+    commit_counts.each_with_object({}) do |(period_key, commit_count), averages|
+      committer_count = committer_counts[period_key].to_i
+      averages[period_key] = committer_count.zero? ? 0 : (commit_count.to_f / committer_count).round(2)
+    end
   end
 
 end

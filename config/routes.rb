@@ -19,6 +19,7 @@ Rails.application.routes.draw do
         resources :repositories, constraints: { id: /.*/ }, only: [:index, :show] do
           member do
             get 'ping', to: 'repositories#ping'
+            get 'chart_data', to: 'repositories#chart_data'
           end
           resources :commits, only: [:index]
         end
