@@ -1,6 +1,10 @@
 class ApplicationController < ActionController::Base
   include Pagy::Backend
 
+  rescue_from Pagy::OverflowError do
+    raise ActiveRecord::RecordNotFound
+  end
+
   before_action :set_cache_headers
 
   def default_url_options(options = {})

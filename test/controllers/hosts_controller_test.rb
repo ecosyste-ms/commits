@@ -121,12 +121,19 @@ class HostsControllerTest < ActionDispatch::IntegrationTest
 
     should "support pagination" do
       create_list(:repository, 150, :with_commits, host: @host)
-      
+
       get host_path(@host.name)
       assert_response :success
-      
+
       get host_path(@host.name), params: { page: 2 }
       assert_response :success
+    end
+
+    should "return 404 when page is out of range" do
+      create(:repository, :with_commits, host: @host)
+
+      get host_path(@host.name), params: { page: 9999 }
+      assert_response :not_found
     end
 
     should "set proper cache headers" do
