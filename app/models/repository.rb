@@ -136,6 +136,30 @@ class Repository < ApplicationRecord
     owner_record&.hidden? == true
   end
 
+  def hidden_committer_emails
+    @hidden_committer_emails ||= host.hidden_committer_emails
+  end
+
+  def redact_committers(list)
+    return list if hidden_committer_emails.empty?
+    list.reject { |c| hidden_committer_emails.include?(c[:email] || c['email']) }
+  end
+
+  def redact_commits(list)
+    return list if hidden_committer_emails.empty?
+    list.each do |c|
+      c[:author] = 'redacted <redacted>' if hidden_author?(c[:author])
+      c[:committer] = 'redacted <redacted>' if hidden_author?(c[:committer])
+    end
+    list
+  end
+
+  def hidden_author?(str)
+    return false if str.blank?
+    email = str[/<([^>]+)>/, 1]
+    email && hidden_committer_emails.include?(email)
+  end
+
   def sync_async(remote_ip = '0.0.0.0')
     SyncRepositoryWorker.perform_async(id)
   end
@@ -370,11 +394,11 @@ class Repository < ApplicationRecord
       past_year_output = past_year_output.encode('UTF-8', invalid: :replace, undef: :replace, replace: '?')
     end
 
-    committers = parse_commit_counts(output)
+    committers = redact_committers(parse_commit_counts(output))
 
     return {} if committers.size > 10000
 
-    past_year_committers = parse_commit_counts(past_year_output)
+    past_year_committers = redact_committers(parse_commit_counts(past_year_output))
 
     total_commits = committers.sum{|h| h[:count]}
     total_bot_commits = committers.select{|h| h[:name].ends_with?('[bot]')}.sum{|h| h[:count]}
@@ -700,8 +724,8 @@ class Repository < ApplicationRecord
         co_author_email: Commit.extract_co_author_from_message(cleaned_message)
       }
     end
-    
-    commits
+
+    redact_commits(commits)
   end
 
   def commits_count
@@ -785,8 +809,8 @@ class Repository < ApplicationRecord
         co_author_email: Commit.extract_co_author_from_message(cleaned_message)
       }
     end
-    
-    commits
+
+    redact_commits(commits)
   end
 
   def sync_commits(incremental: true)
@@ -1371,10 +1395,10 @@ class Repository < ApplicationRecord
         co_author_email: Commit.extract_co_author_from_message(cleaned_message)
       }
     end
-    
-    commits
+
+    redact_commits(commits)
   end
-  
+
   def fetch_commits_by_date_range(dir, since_date, until_date)
     format = "%H%x00%P%x00%an%x00%ae%x00%cn%x00%ce%x00%aI%x00%B"
     

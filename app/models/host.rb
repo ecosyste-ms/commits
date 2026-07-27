@@ -63,6 +63,10 @@ class Host < ApplicationRecord
     owners.where(hidden: true).where('lower(login) = ?', login.downcase).exists?
   end
 
+  def hidden_committer_emails
+    committers.where(hidden: true).pluck(:emails).flatten.compact.to_set
+  end
+
   def sync_repository_async(full_name, remote_ip = '0.0.0.0')
     return nil if owner_hidden?(full_name.split('/').first)
     repo = Repository.find_or_create_from_host(self, full_name)

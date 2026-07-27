@@ -842,4 +842,71 @@ Co-authored-by: Claude <noreply@anthropic.com>" 2>&1`
       assert_equal false, @repository.owner_hidden?
     end
   end
+
+  context 'hidden committer redaction' do
+    setup do
+      @host.committers.create!(emails: ['hidden@example.com'], hidden: true)
+    end
+
+    should 'drop hidden emails from committers list' do
+      list = [
+        { name: 'Keep', email: 'keep@example.com', login: nil, count: 5 },
+        { name: 'Hide', email: 'hidden@example.com', login: nil, count: 1 }
+      ]
+      result = @repository.redact_committers(list)
+      assert_equal ['keep@example.com'], result.map { |c| c[:email] }
+    end
+
+    should 'drop hidden emails from committers list with string keys' do
+      list = [
+        { 'name' => 'Keep', 'email' => 'keep@example.com', 'count' => 5 },
+        { 'name' => 'Hide', 'email' => 'hidden@example.com', 'count' => 1 }
+      ]
+      result = @repository.redact_committers(list)
+      assert_equal ['keep@example.com'], result.map { |c| c['email'] }
+    end
+
+    should 'redact author and committer strings on commits' do
+      list = [
+        { sha: 'a', author: 'Keep <keep@example.com>', committer: 'Keep <keep@example.com>' },
+        { sha: 'b', author: 'Hide <hidden@example.com>', committer: 'Other <other@example.com>' },
+        { sha: 'c', author: 'Other <other@example.com>', committer: 'Hide <hidden@example.com>' }
+      ]
+      result = @repository.redact_commits(list)
+      assert_equal 'Keep <keep@example.com>', result[0][:author]
+      assert_equal 'redacted <redacted>', result[1][:author]
+      assert_equal 'Other <other@example.com>', result[1][:committer]
+      assert_equal 'redacted <redacted>', result[2][:committer]
+    end
+
+    should 'return list unchanged when no hidden committers' do
+      @host.committers.where(hidden: true).delete_all
+      repo = Repository.create!(host: @host, full_name: 'other/repo')
+      list = [{ sha: 'a', author: 'X <x@example.com>', committer: 'X <x@example.com>' }]
+      assert_same list, repo.redact_commits(list)
+    end
+
+    should 'filter hidden emails from count_commits_internal output' do
+      Dir.mktmpdir do |dir|
+        `git init #{dir} 2>&1`
+        File.write("#{dir}/f1", "1")
+        `cd #{dir} && git add . && git -c user.name="Keep" -c user.email="keep@example.com" commit -m "one" 2>&1`
+        File.write("#{dir}/f2", "2")
+        `cd #{dir} && git add . && git -c user.name="Hide" -c user.email="hidden@example.com" commit -m "two" 2>&1`
+
+        result = @repository.count_commits_internal(dir)
+        emails = result[:committers].map { |c| c[:email] }
+        assert_includes emails, 'keep@example.com'
+        refute_includes emails, 'hidden@example.com'
+      end
+    end
+
+    should 'redact hidden emails in parse_commit_output' do
+      fields = ['sha1', '', 'Hide', 'hidden@example.com', 'Hide', 'hidden@example.com', '2020-01-01T00:00:00Z', 'msg']
+      output = fields.join("\0") + "\0"
+      result = @repository.parse_commit_output(output)
+      assert_equal 'redacted <redacted>', result.first[:author]
+      assert_equal 'redacted <redacted>', result.first[:committer]
+    end
+  end
 end
