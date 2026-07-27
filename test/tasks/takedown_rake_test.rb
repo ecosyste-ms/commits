@@ -57,7 +57,8 @@ class TakedownRakeTest < ActiveSupport::TestCase
     create(:commit, repository: repo, sha: 'bbb', author: 'Keep <keep@example.com>', committer: 'Keep <keep@example.com>')
 
     ENV['EMAIL'] = 'hide@example.com'
-    capture_io { Rake::Task["takedown:hide_committer"].execute }
+    out, _ = capture_io { Rake::Task["takedown:hide_committer"].execute }
+    assert_match "scrubbed 1 repositories", out
 
     committer = @host.committers.email('hide@example.com').first
     refute_nil committer

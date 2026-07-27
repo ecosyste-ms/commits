@@ -42,8 +42,8 @@ namespace :takedown do
     committer.update!(hidden: true)
     puts "[commits] hidden committer #{host.name}/#{email}"
 
-    repos = host.repositories.committer_email(email)
-    repos.find_each do |repo|
+    repo_count = 0
+    host.repositories.committer_email(email).find_each do |repo|
       Contribution.find_or_create_by!(repository_id: repo.id, committer_id: committer.id)
       repo.update_columns(
         committers: repo.redact_committers(repo.committers || []),
@@ -52,8 +52,9 @@ namespace :takedown do
       redacted = repo.commits.where("author LIKE ? OR committer LIKE ?", "%<#{email}>%", "%<#{email}>%")
                      .update_all(author: 'redacted <redacted>', committer: 'redacted <redacted>')
       puts "[commits] scrubbed #{repo.full_name} (#{redacted} commit rows)"
+      repo_count += 1
     end
-    puts "[commits] scrubbed #{repos.count} repositories for #{host.name}/#{email}"
+    puts "[commits] scrubbed #{repo_count} repositories for #{host.name}/#{email}"
   end
 
   desc "Report what exists for a user. LOGIN=username [HOST=GitHub]"
