@@ -6,6 +6,7 @@ class OwnersControllerTest < ActionDispatch::IntegrationTest
     @owner1_repos = 3.times.map { |i| create(:repository, :with_commits, host: @host, owner: "owner1", full_name: "owner1/repo#{i}") }
     @owner2_repos = 5.times.map { |i| create(:repository, :with_commits, host: @host, owner: "owner2", full_name: "owner2/repo#{i}") }
     @owner3_repos = [create(:repository, :with_commits, host: @host, owner: "owner3", full_name: "owner3/repo")]
+    @host.update_owner_counts
   end
 
   context "GET #index" do
@@ -69,17 +70,19 @@ class OwnersControllerTest < ActionDispatch::IntegrationTest
     should "only count visible repositories" do
       # Create an inactive repository
       create(:repository, host: @host, owner: "owner4", full_name: "owner4/repo", status: "not_found")
-      
+      @host.update_owner_counts
+
       get host_owners_path(@host.name)
       assert_response :success
-      
+
       # owner4 should not appear since their only repo is not active
       assert_no_match "owner4", response.body
     end
 
     should "handle owners with special characters" do
       create(:repository, :with_commits, host: @host, owner: "special-owner_123", full_name: "special-owner_123/repo")
-      
+      @host.update_owner_counts
+
       get host_owners_path(@host.name)
       assert_response :success
       assert_match "special-owner_123", response.body
@@ -87,6 +90,7 @@ class OwnersControllerTest < ActionDispatch::IntegrationTest
 
     should "handle repositories with nil owner" do
       create(:repository, :with_commits, host: @host, owner: nil, full_name: "no-owner/repo")
+      @host.update_owner_counts
 
       get host_owners_path(@host.name)
       assert_response :success
@@ -101,7 +105,7 @@ class OwnersControllerTest < ActionDispatch::IntegrationTest
     end
 
     should "exclude hidden owners from index" do
-      create(:owner, host: @host, login: 'owner1', hidden: true)
+      @host.owners.find_by!(login: 'owner1').update!(hidden: true)
       get host_owners_path(@host.name)
       assert_response :success
       assert_no_match "owner1", response.body
@@ -194,7 +198,7 @@ class OwnersControllerTest < ActionDispatch::IntegrationTest
     end
 
     should "return 404 for hidden owner" do
-      create(:owner, host: @host, login: 'owner1', hidden: true)
+      @host.owners.find_by!(login: 'owner1').update!(hidden: true)
       get host_owner_path(@host.name, "owner1")
       assert_response :not_found
     end

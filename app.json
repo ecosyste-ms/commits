@@ -17,6 +17,10 @@
       "schedule": "0 0 * * *"
     },
     {
+      "command": "bundle exec rake owners:update_counts",
+      "schedule": "30 2 * * *"
+    },
+    {
       "command": "bundle exec rake sidekiq:unique_jobs:clear",
       "schedule": "0 0 * * 0"
     }

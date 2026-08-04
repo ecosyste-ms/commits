@@ -152,6 +152,44 @@ class HostTest < ActiveSupport::TestCase
     end
   end
 
+  context 'update_owner_counts' do
+    should 'upsert owner rows with visible repository counts' do
+      host = create(:host)
+      3.times { |i| create(:repository, :with_commits, host: host, full_name: "alpha/r#{i}") }
+      create(:repository, :with_commits, host: host, full_name: "beta/r")
+      create(:repository, host: host, full_name: "gamma/r", status: 'not_found')
+
+      host.update_owner_counts
+
+      assert_equal 3, host.owners.find_by(login: 'alpha').repositories_count
+      assert_equal 1, host.owners.find_by(login: 'beta').repositories_count
+      assert_nil host.owners.find_by(login: 'gamma')
+    end
+
+    should 'update repositories_count on existing owner and preserve hidden' do
+      host = create(:host)
+      existing = create(:owner, host: host, login: 'alpha', hidden: true, repositories_count: 0)
+      create(:repository, :with_commits, host: host, full_name: "alpha/r")
+
+      host.update_owner_counts
+
+      existing.reload
+      assert_equal 1, existing.repositories_count
+      assert existing.hidden
+    end
+
+    should 'zero repositories_count for owners no longer in visible repos' do
+      host = create(:host)
+      stale = create(:owner, host: host, login: 'gone', repositories_count: 5, updated_at: 1.day.ago)
+      create(:repository, :with_commits, host: host, full_name: "kept/r")
+
+      host.update_owner_counts
+
+      assert_equal 0, stale.reload.repositories_count
+      assert_equal 1, host.owners.find_by(login: 'kept').repositories_count
+    end
+  end
+
   context 'sync_repository_async' do
     should 'skip hidden owners' do
       host = create(:host, :github)

@@ -108,6 +108,29 @@ class Host < ApplicationRecord
     save
   end
 
+  def self.update_owner_counts
+    Host.all.each(&:update_owner_counts)
+  end
+
+  def update_owner_counts
+    started_at = self.class.connection.select_value('SELECT clock_timestamp()')
+    self.class.connection.exec_query(<<~SQL.squish, 'Host#update_owner_counts', [id])
+      INSERT INTO owners (host_id, login, repositories_count, created_at, updated_at)
+      SELECT $1, owner, COUNT(*), clock_timestamp(), clock_timestamp()
+      FROM repositories
+      WHERE host_id = $1
+        AND status IS NULL
+        AND last_synced_at IS NOT NULL
+        AND total_commits IS NOT NULL
+        AND owner IS NOT NULL
+      GROUP BY owner
+      ON CONFLICT (host_id, login) DO UPDATE
+        SET repositories_count = EXCLUDED.repositories_count,
+            updated_at = EXCLUDED.updated_at
+    SQL
+    owners.where('repositories_count > 0 AND updated_at < ?', started_at).update_all(repositories_count: 0)
+  end
+
   def self.sync_all
     conn = Faraday.new('https://repos.ecosyste.ms') do |f|
       f.request :json

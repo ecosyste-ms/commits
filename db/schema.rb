@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_04_103803) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_04_110831) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -91,8 +91,10 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_04_103803) do
     t.boolean "hidden", default: false
     t.integer "host_id"
     t.string "login"
+    t.bigint "repositories_count", default: 0
     t.datetime "updated_at", null: false
     t.index ["host_id", "login"], name: "index_owners_on_host_id_and_login", unique: true
+    t.index ["host_id", "repositories_count"], name: "index_owners_on_host_id_and_repositories_count", order: { repositories_count: :desc }
   end
 
   create_table "repositories", force: :cascade do |t|
