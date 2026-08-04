@@ -57,7 +57,11 @@ class Repository < ApplicationRecord
   before_save :set_owner
 
   def self.sync_least_recently_synced
-    Repository.active.order('last_synced_at ASC').limit(100).each(&:sync_async)
+    Repository.visible.order('last_synced_at ASC').limit(100).each(&:sync_async)
+  end
+
+  def self.sync_invisible
+    Repository.active.where(total_commits: nil).order('last_synced_at ASC NULLS FIRST').limit(100).each(&:sync_async)
   end
 
   def self.find_or_create_from_host(host, full_name)

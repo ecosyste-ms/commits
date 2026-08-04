@@ -17,6 +17,10 @@
       "schedule": "*/10 * * * *"
     },
     {
+      "command": "bundle exec rake repositories:sync_invisible",
+      "schedule": "0 * * * *"
+    },
+    {
       "command": "bundle exec rake hosts:sync_all",
       "schedule": "0 0 * * *"
     },

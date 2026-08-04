@@ -11,6 +11,42 @@ class RepositoryTest < ActiveSupport::TestCase
     should validate_presence_of(:full_name)
   end
 
+  context '.sync_least_recently_synced' do
+    should 'enqueue visible repos ordered by oldest last_synced_at' do
+      host = create(:host)
+      old = create(:repository, :with_commits, host: host, last_synced_at: 2.days.ago)
+      new = create(:repository, :with_commits, host: host, last_synced_at: 1.hour.ago)
+      invisible = create(:repository, host: host, last_synced_at: 3.days.ago, total_commits: nil)
+
+      SyncRepositoryWorker.clear
+      Repository.sync_least_recently_synced
+
+      enqueued = SyncRepositoryWorker.jobs.map { |j| j['args'].first }
+      assert_equal [old.id, new.id], enqueued
+      refute_includes enqueued, invisible.id
+    end
+  end
+
+  context '.sync_invisible' do
+    should 'enqueue active repos with nil total_commits, never-synced first' do
+      host = create(:host)
+      never_synced = create(:repository, :not_synced, host: host)
+      synced_no_commits = create(:repository, host: host, last_synced_at: 1.day.ago, total_commits: nil)
+      visible = create(:repository, :with_commits, host: host)
+      inactive = create(:repository, host: host, status: 'not_found', total_commits: nil)
+
+      SyncRepositoryWorker.clear
+      Repository.sync_invisible
+
+      enqueued = SyncRepositoryWorker.jobs.map { |j| j['args'].first }
+      assert_includes enqueued, never_synced.id
+      assert_includes enqueued, synced_no_commits.id
+      assert enqueued.index(never_synced.id) < enqueued.index(synced_no_commits.id)
+      refute_includes enqueued, visible.id
+      refute_includes enqueued, inactive.id
+    end
+  end
+
   def setup
     @host = Host.create!(name: "github.com", url: "https://github.com", kind: "github")
     @repository = Repository.create!(
