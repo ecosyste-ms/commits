@@ -4,7 +4,7 @@ class Api::V1::CommittersController < Api::V1::ApplicationController
   def show
     @committer = @host.committers.find_by(login: params[:id])
     if @committer.nil?
-      @committer = Committer.email(params[:id]).first
+      @committer = Committer.email(params[:id]).to_a.first
       if @committer && @committer.login.present?
         redirect_to api_v1_host_committer_path(@host, @committer), status: :moved_permanently
       end
