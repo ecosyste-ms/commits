@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_03_25_131003) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_04_094846) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -125,6 +125,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_03_25_131003) do
     t.datetime "updated_at", null: false
     t.index "host_id, lower((full_name)::text)", name: "index_repositories_on_host_id_lower_full_name", unique: true
     t.index ["host_id", "owner"], name: "index_repositories_on_host_id_and_owner"
+    t.index ["last_synced_at"], name: "index_repositories_visible_last_synced_at", order: :desc, where: "((status IS NULL) AND (last_synced_at IS NOT NULL) AND (total_commits IS NOT NULL))"
   end
 
   add_foreign_key "contributions", "committers"
