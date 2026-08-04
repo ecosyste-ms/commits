@@ -104,6 +104,7 @@ class Host < ApplicationRecord
     self.commits_count = repositories.visible.sum(:total_commits)
     self.contributors_count = repositories.visible.sum(:total_committers)
     self.owners_count = repositories.visible.count('distinct owner')
+    self.committers_count = committers.count
     save
   end
 

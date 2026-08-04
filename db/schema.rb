@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_04_094846) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_04_101919) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -64,6 +64,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_04_094846) do
   create_table "hosts", force: :cascade do |t|
     t.boolean "can_crawl_api", default: true
     t.bigint "commits_count"
+    t.bigint "committers_count", default: 0
     t.bigint "contributors_count"
     t.datetime "created_at", null: false
     t.text "host_url"
