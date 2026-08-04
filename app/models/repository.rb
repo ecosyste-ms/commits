@@ -520,13 +520,9 @@ class Repository < ApplicationRecord
     REDIS.sadd('github_emails_nil', email) if login.nil?
     return nil if login.nil?
     # find committer by login and add email to committer
-    committer = host.committers.find_by(login: login)
-    if committer
-      committer.emails << email
-      committer.save
-    else
-      committer = host.committers.create(login: login, emails: [email])
-    end
+    committer = host.committers.find_or_create_by(login: login)
+    committer.emails = (committer.emails.to_a + [email]).uniq
+    committer.save
     committer.login
   rescue => e
     puts e
