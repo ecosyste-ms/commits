@@ -6,9 +6,9 @@ class CommittersController < ApplicationController
 
     sort = sanitize_sort(Committer.sortable_columns)
     if params[:order] == 'asc'
-      scope = scope.order(sort.asc.nulls_last)
+      scope = scope.order(sort.asc)
     else
-      scope = scope.order(sort.desc.nulls_last)
+      scope = scope.order(sort.desc)
     end
 
     fresh_when scope, public: true

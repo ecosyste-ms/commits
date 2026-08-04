@@ -2,10 +2,14 @@ class OwnersController < ApplicationController
   before_action :find_host
 
   def index
-    scope = @host.repositories.visible.group(:owner).count.sort_by { |k, v| [-v, k.to_s] }
-    @hidden_owners = @host.owners.hidden.pluck(:login).to_set
-    @pagy, @owners = pagy_array(scope)
-    @owners ||= []
+    hidden = @host.owners.hidden.pluck(:login)
+    scope = @host.repositories.visible
+      .where.not(owner: nil)
+      .select('owner, COUNT(*) AS repositories_count')
+      .group(:owner)
+      .order(Arel.sql('COUNT(*) DESC, owner ASC'))
+    scope = scope.where.not(owner: hidden) if hidden.any?
+    @pagy, @owners = pagy_countless(scope)
   end
 
   def show

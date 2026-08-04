@@ -33,20 +33,17 @@
     </li>
   </ul>
 
-  <% @owners.each do |owner, count| %>
-    <% next if owner.nil? %>
-    <% next if @hidden_owners.include?(owner) %>
+  <% @owners.each do |o| %>
     <div class="card mb-3">
       <div class="card-body">
         <h5 class="card-title">
-          <%= link_to owner, host_owner_path(@host, owner) %>
+          <%= link_to o.owner, host_owner_path(@host, o.owner) %>
         </h5>
         <p class="card-text">
-          Repositories: <%= number_with_delimiter count %>
+          Repositories: <%= number_with_delimiter o.repositories_count %>
         </p>
       </div>
     </div>
-  
   <% end %>
 
   <%== pagy_bootstrap_nav(@pagy) if @pagy.pages > 1 %>  

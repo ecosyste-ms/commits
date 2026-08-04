@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_04_101919) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_04_103803) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -41,6 +41,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_04_101919) do
     t.datetime "updated_at", null: false
     t.index ["emails"], name: "index_committers_on_emails", using: :gin
     t.index ["host_id", "login"], name: "index_committers_on_host_id_and_login"
+    t.index ["host_id", "updated_at"], name: "index_committers_on_host_id_updated_at", order: { updated_at: :desc }, where: "(commits_count > 0)"
   end
 
   create_table "contributions", force: :cascade do |t|
