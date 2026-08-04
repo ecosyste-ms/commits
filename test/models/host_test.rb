@@ -141,6 +141,17 @@ class HostTest < ActiveSupport::TestCase
     end
   end
 
+  context 'update_counts' do
+    should 'set committers_count from associated committers' do
+      host = create(:host, committers_count: 0)
+      create_list(:committer, 3, host: host)
+
+      host.update_counts
+
+      assert_equal 3, host.reload.committers_count
+    end
+  end
+
   context 'sync_repository_async' do
     should 'skip hidden owners' do
       host = create(:host, :github)
