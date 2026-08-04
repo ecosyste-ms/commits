@@ -13,9 +13,9 @@ class HostsController < ApplicationController
 
     sort = sanitize_sort(Repository.sortable_columns, default: 'last_synced_at')
     if params[:order] == 'asc'
-      scope = scope.order(sort.asc.nulls_last)
+      scope = scope.order(sort.asc)
     else
-      scope = scope.order(sort.desc.nulls_last)
+      scope = scope.order(sort.desc)
     end
 
     @pagy, @repositories = pagy_countless(scope)
