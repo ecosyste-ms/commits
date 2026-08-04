@@ -40,23 +40,25 @@ class Committer < ApplicationRecord
     others = Array(others).reject { |o| o.id == id }
     return self if others.empty?
 
-    self.emails = (emails.to_a + others.flat_map(&:emails).compact).uniq
-    self.hidden = true if others.any?(&:hidden?)
-    save!
+    transaction do
+      self.emails = (emails.to_a + others.flat_map(&:emails).compact).uniq
+      self.hidden = true if others.any?(&:hidden?)
+      save!
 
-    others.each do |other|
-      other.contributions.find_each do |c|
-        existing = Contribution.find_by(committer_id: id, repository_id: c.repository_id)
+      existing_by_repo = contributions.index_by(&:repository_id)
+      Contribution.where(committer_id: others.map(&:id)).find_each do |c|
+        existing = existing_by_repo[c.repository_id]
         if existing
           existing.update!(commit_count: existing.commit_count.to_i + c.commit_count.to_i)
           c.delete
         else
-          c.update_columns(committer_id: id)
+          c.update!(committer_id: id)
+          existing_by_repo[c.repository_id] = c
         end
       end
-    end
 
-    Committer.where(id: others.map(&:id)).delete_all
+      Committer.where(id: others.map(&:id)).delete_all
+    end
     update_commits_count
     self
   end
@@ -81,7 +83,7 @@ class Committer < ApplicationRecord
     seen = 0
     updated = 0
     Repository.where.not(committers: nil).select(:id, :host_id, :committers).find_in_batches(batch_size: batch_size) do |batch|
-      pairs = Hash.new { |h, k| h[k] = Set.new }
+      pairs = Hash.new { |h, k| h[k] = [] }
       batch.each do |r|
         Array(r.committers).each do |entry|
           login = entry['login']
@@ -93,7 +95,7 @@ class Committer < ApplicationRecord
       pairs.each do |(host_id, login), emails|
         committer = find_or_initialize_by(host_id: host_id, login: login)
         before = committer.emails.to_a
-        merged = (before + emails.to_a).uniq
+        merged = (before + emails).uniq
         next if committer.persisted? && merged == before
         committer.emails = merged
         committer.save!
