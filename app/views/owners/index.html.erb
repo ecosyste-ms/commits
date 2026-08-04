@@ -33,14 +33,14 @@
     </li>
   </ul>
 
-  <% @owners.each do |o| %>
+  <% @owners.each do |owner| %>
     <div class="card mb-3">
       <div class="card-body">
         <h5 class="card-title">
-          <%= link_to o.owner, host_owner_path(@host, o.owner) %>
+          <%= link_to owner.login, host_owner_path(@host, owner.login) %>
         </h5>
         <p class="card-text">
-          Repositories: <%= number_with_delimiter o.repositories_count %>
+          Repositories: <%= number_with_delimiter owner.repositories_count %>
         </p>
       </div>
     </div>
