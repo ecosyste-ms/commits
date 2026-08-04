@@ -114,11 +114,11 @@ class Host < ApplicationRecord
 
   def update_owner_counts
     started_at = Time.current
-    self.class.connection.execute <<~SQL.squish
+    self.class.connection.exec_query(<<~SQL.squish, 'Host#update_owner_counts', [id])
       INSERT INTO owners (host_id, login, repositories_count, created_at, updated_at)
-      SELECT #{id}, owner, COUNT(*), clock_timestamp(), clock_timestamp()
+      SELECT $1, owner, COUNT(*), clock_timestamp(), clock_timestamp()
       FROM repositories
-      WHERE host_id = #{id}
+      WHERE host_id = $1
         AND status IS NULL
         AND last_synced_at IS NOT NULL
         AND total_commits IS NOT NULL
