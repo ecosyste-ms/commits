@@ -56,4 +56,16 @@ class CacheHeadersTest < ActionDispatch::IntegrationTest
     cache_control = response.headers['Cache-Control'].to_s
     assert_no_match(/s-maxage/, cache_control)
   end
+
+  test "html pages do not set cookies" do
+    get host_path(@host)
+    assert_response :success
+    assert_nil response.headers['Set-Cookie']
+  end
+
+  test "api endpoints do not set cookies" do
+    get api_v1_hosts_url, as: :json
+    assert_response :success
+    assert_nil response.headers['Set-Cookie']
+  end
 end
