@@ -5,10 +5,23 @@ class CommitterDedupeTest < ActiveSupport::TestCase
     @host = create(:host)
   end
 
-  test 'merge! combines emails, repoints contributions and removes duplicates' do
+  test 'duplicate host_id and login is rejected by the unique index' do
+    create(:committer, host: @host, login: 'alice')
+    assert_raises(ActiveRecord::RecordNotUnique) do
+      create(:committer, host: @host, login: 'alice')
+    end
+  end
+
+  test 'multiple committers with nil login on the same host are allowed' do
+    create(:committer, :no_login, host: @host)
+    create(:committer, :no_login, host: @host)
+    assert_equal 2, Committer.where(host: @host, login: nil).count
+  end
+
+  test 'merge! combines emails, repoints contributions, carries hidden and removes the merged rows' do
     keeper = create(:committer, host: @host, login: 'alice', emails: ['a@one.com'])
-    dupe1  = create(:committer, host: @host, login: 'alice', emails: ['a@two.com'])
-    dupe2  = create(:committer, host: @host, login: 'alice', emails: ['a@one.com', 'a@three.com'], hidden: true)
+    dupe1  = create(:committer, host: @host, login: 'alice-dupe1', emails: ['a@two.com'])
+    dupe2  = create(:committer, host: @host, login: 'alice-dupe2', emails: ['a@one.com', 'a@three.com'], hidden: true)
 
     repo1 = create(:repository, host: @host)
     repo2 = create(:repository, host: @host)
@@ -29,26 +42,10 @@ class CommitterDedupeTest < ActiveSupport::TestCase
     assert_nil Committer.find_by(id: dupe2.id)
   end
 
-  test 'dedupe finds and merges all duplicate groups by host_id and login' do
-    3.times { create(:committer, host: @host, login: 'bob', emails: ["bob#{_1}@x.com"]) }
-    other_host = create(:host)
-    create(:committer, host: other_host, login: 'bob', emails: ['bob@other.com'])
+  test 'dedupe returns zero when the unique index prevents duplicates' do
+    create(:committer, host: @host, login: 'bob')
     create(:committer, host: @host, login: 'carol')
-
-    removed = Committer.dedupe
-
-    assert_equal 2, removed
-    assert_equal 1, Committer.where(host: @host, login: 'bob').count
-    assert_equal 1, Committer.where(host: other_host, login: 'bob').count
-    assert_equal %w[bob0@x.com bob1@x.com bob2@x.com].sort, Committer.find_by(host: @host, login: 'bob').emails.sort
-  end
-
-  test 'dedupe ignores rows with blank login' do
-    create(:committer, :no_login, host: @host)
-    create(:committer, :no_login, host: @host)
-
     assert_equal 0, Committer.dedupe
-    assert_equal 2, Committer.where(host: @host, login: nil).count
   end
 
   test 'backfill_emails_from_repositories merges emails from repository JSON into committers' do
@@ -82,5 +79,19 @@ class CommitterDedupeTest < ActiveSupport::TestCase
     create(:repository, host: @host, committers: [{ 'login' => 'johndoe', 'email' => 'john@example.com', 'count' => 1 }])
 
     assert_equal 0, Committer.backfill_emails_from_repositories(batch_size: 10)
+  end
+
+  test 'backfill_emails_from_repositories recovers when a concurrent insert wins the race' do
+    existing = create(:committer, host: @host, login: 'racer', emails: ['old@x.com'])
+    create(:repository, host: @host, committers: [{ 'login' => 'racer', 'email' => 'new@x.com', 'count' => 1 }])
+
+    Committer.stubs(:find_or_initialize_by).with(host_id: @host.id, login: 'racer').returns(Committer.new(host_id: @host.id, login: 'racer'))
+
+    Committer.backfill_emails_from_repositories(batch_size: 10)
+
+    existing.reload
+    assert_includes existing.emails, 'old@x.com'
+    assert_includes existing.emails, 'new@x.com'
+    assert_equal 1, Committer.where(host: @host, login: 'racer').count
   end
 end

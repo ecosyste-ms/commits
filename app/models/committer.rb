@@ -98,7 +98,12 @@ class Committer < ApplicationRecord
         merged = (before + emails).uniq
         next if committer.persisted? && merged == before
         committer.emails = merged
-        committer.save!
+        begin
+          committer.save!
+        rescue ActiveRecord::RecordNotUnique
+          committer = find_by!(host_id: host_id, login: login)
+          committer.update!(emails: (committer.emails.to_a + emails).uniq)
+        end
         updated += 1
       end
       seen += batch.size

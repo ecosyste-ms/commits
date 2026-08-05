@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[8.1].define(version: 2026_08_04_182132) do
+ActiveRecord::Schema[8.1].define(version: 2026_08_05_073008) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "pg_catalog.plpgsql"
   enable_extension "pgcrypto"
@@ -40,7 +40,7 @@ ActiveRecord::Schema[8.1].define(version: 2026_08_04_182132) do
     t.string "login"
     t.datetime "updated_at", null: false
     t.index ["emails"], name: "index_committers_on_emails", using: :gin
-    t.index ["host_id", "login"], name: "index_committers_on_host_id_and_login"
+    t.index ["host_id", "login"], name: "index_committers_on_host_id_and_login", unique: true
     t.index ["host_id", "updated_at"], name: "index_committers_on_host_id_updated_at", order: { updated_at: :desc }, where: "(commits_count > 0)"
     t.index ["host_id"], name: "index_committers_hidden_by_host", where: "(hidden = true)"
   end
