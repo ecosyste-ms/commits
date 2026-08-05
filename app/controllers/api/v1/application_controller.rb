@@ -1,5 +1,4 @@
 class Api::V1::ApplicationController < ApplicationController
-  skip_before_action :verify_authenticity_token
   before_action :set_api_cache_headers
   after_action { pagy_headers_merge(@pagy) if @pagy }
 
