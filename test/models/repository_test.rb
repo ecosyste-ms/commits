@@ -797,6 +797,21 @@ Co-authored-by: Second <second@example.com>" 2>&1`
     end
   end
 
+  test "sync_all clears stale status after a successful sync" do
+    @repository.update!(status: 'too_large', last_synced_at: nil)
+    @repository.stubs(:fetch_head_sha).returns('abc123')
+    @repository.stubs(:clone_repository)
+    @repository.stubs(:count_commits_internal).returns(total_commits: 1, total_committers: 1)
+    @repository.stubs(:sync_commits_batch).returns(1)
+
+    @repository.sync_all
+
+    @repository.reload
+    assert_nil @repository.status
+    assert_not_nil @repository.last_synced_at
+    assert_includes Repository.visible, @repository
+  end
+
   test "sync_all correctly uses repo subdirectory after cloning" do
     Dir.mktmpdir do |source_dir|
       `git init #{source_dir} 2>&1`
