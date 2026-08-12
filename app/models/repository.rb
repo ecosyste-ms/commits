@@ -368,6 +368,7 @@ class Repository < ApplicationRecord
           create_committer_join_records
         end
       end
+      update!(status: nil)
     rescue => e
       self.status = 'too_large' if e.message.include?('timed out') || e.message.include?('too many committers')
       self.save
