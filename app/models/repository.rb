@@ -1,5 +1,8 @@
+require 'base64'
+
 class Repository < ApplicationRecord
   class CloneError < StandardError; end
+  class TransientCloneError < CloneError; end
   class TimeoutError < StandardError; end
   class SyncError < StandardError; end
 
@@ -220,11 +223,21 @@ class Repository < ApplicationRecord
   end
 
   def git_env_no_prompt
-    {
+    env = {
       'GIT_TERMINAL_PROMPT' => '0',
       'GIT_ASKPASS' => 'echo',
       'SSH_ASKPASS' => 'echo'
     }
+
+    token = ENV['GITHUB_GIT_TOKEN']
+    return env if token.blank?
+
+    credentials = Base64.strict_encode64("x-access-token:#{token}")
+    env.merge(
+      'GIT_CONFIG_COUNT' => '1',
+      'GIT_CONFIG_KEY_0' => 'http.https://github.com/.extraHeader',
+      'GIT_CONFIG_VALUE_0' => "Authorization: Basic #{credentials}"
+    )
   end
 
   def git_command(*args)
@@ -280,7 +293,7 @@ class Repository < ApplicationRecord
         update_column(:status, 'not_found')
         raise CloneError, "Repository #{full_name} appears to be deleted or private"
       end
-      raise CloneError, "Failed to clone #{full_name}: #{full_output}"
+      raise TransientCloneError, "Failed to clone #{full_name}: #{full_output}"
     end
   end
 
@@ -373,6 +386,8 @@ class Repository < ApplicationRecord
         end
       end
       update!(status: nil)
+    rescue TransientCloneError
+      raise
     rescue => e
       self.status = 'too_large' if e.message.include?('timed out') || e.message.include?('too many committers')
       self.save

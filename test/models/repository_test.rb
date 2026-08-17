@@ -458,6 +458,26 @@ class RepositoryTest < ActiveSupport::TestCase
     end
   end
 
+  test "git environment remains unauthenticated without a token" do
+    ENV.stubs(:[]).with('GITHUB_GIT_TOKEN').returns(nil)
+
+    env = @repository.git_env_no_prompt
+
+    assert_equal '0', env['GIT_TERMINAL_PROMPT']
+    refute env.key?('GIT_CONFIG_COUNT')
+  end
+
+  test "git environment authenticates GitHub requests with a scoped header" do
+    ENV.stubs(:[]).with('GITHUB_GIT_TOKEN').returns('test-token')
+
+    env = @repository.git_env_no_prompt
+
+    credentials = Base64.strict_encode64('x-access-token:test-token')
+    assert_equal '1', env['GIT_CONFIG_COUNT']
+    assert_equal 'http.https://github.com/.extraHeader', env['GIT_CONFIG_KEY_0']
+    assert_equal "Authorization: Basic #{credentials}", env['GIT_CONFIG_VALUE_0']
+  end
+
   # Tests for deleted repository handling
   test "clone_repository marks repository as not_found when deleted from GitHub" do
     Dir.mktmpdir do |dir|
@@ -491,14 +511,14 @@ class RepositoryTest < ActiveSupport::TestCase
     end
   end
 
-  test "clone_repository raises regular CloneError for other failures" do
+  test "clone_repository raises transient CloneError for other failures" do
     Dir.mktmpdir do |dir|
       # Stub the git clone command to simulate a different error
       @repository.stubs(:git_command).with('clone', '--filter=blob:none', '--single-branch', '--quiet', @repository.git_clone_url, anything).returns(
         ["", "fatal: unable to access 'https://github.com/test/repo.git/': Connection timed out", stub(success?: false)]
       )
       
-      error = assert_raises(Repository::CloneError) do
+      error = assert_raises(Repository::TransientCloneError) do
         @repository.clone_repository(dir)
       end
       
@@ -826,6 +846,22 @@ Co-authored-by: Second <second@example.com>" 2>&1`
     assert_nil @repository.status
     assert_not_nil @repository.last_synced_at
     assert_includes Repository.visible, @repository
+  end
+
+  test "sync_all reraises transient clone errors for Sidekiq" do
+    @repository.stubs(:fetch_head_sha).returns(nil)
+    @repository.stubs(:clone_repository).raises(
+      Repository::TransientCloneError,
+      'Failed to clone test/repo: HTTP 401'
+    )
+
+    error = assert_raises(Repository::TransientCloneError) do
+      @repository.sync_all
+    end
+
+    assert_match(/HTTP 401/, error.message)
+    assert_not_nil @repository.reload.last_synced_at
+    assert_predicate @repository, :sync_pending?
   end
 
   test "sync_all correctly uses repo subdirectory after cloning" do
