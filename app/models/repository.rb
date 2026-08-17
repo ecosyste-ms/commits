@@ -367,7 +367,7 @@ class Repository < ApplicationRecord
         sync_commits_batch(repo_dir, force: force)
         
         # Handle committers
-        if committers
+        if committers.present?
           fetch_all_logins
           create_committer_join_records
         end
@@ -386,8 +386,14 @@ class Repository < ApplicationRecord
 
   def count_commits_internal(dir)
     # First check if this is a git repository
-    last_commit = `git #{git_dir_arg(dir)} rev-parse HEAD 2>/dev/null`.strip
-    return {} if last_commit.empty? || !$?.success?
+    last_commit, _error, head_status = git_command(*git_dir_args(dir), 'rev-parse', 'HEAD')
+    if last_commit.strip.empty? || !head_status.success?
+      _output, _error, repository_status = git_command(*git_dir_args(dir), 'rev-parse', '--git-dir')
+      return {} unless repository_status.success?
+
+      return empty_commit_counts
+    end
+    last_commit = last_commit.strip
     
     output = `git #{git_dir_arg(dir)} shortlog -s -n -e --no-merges HEAD 2>/dev/null`
     # Force UTF-8 encoding and replace invalid characters
@@ -440,6 +446,27 @@ class Repository < ApplicationRecord
       past_year_mean_commits: past_year_mean_commits,
       past_year_dds: past_year_dds,
       last_synced_at: Time.now
+    }
+  end
+
+  def empty_commit_counts
+    {
+      committers: [],
+      last_synced_commit: nil,
+      total_commits: 0,
+      total_committers: 0,
+      total_bot_commits: 0,
+      total_bot_committers: 0,
+      mean_commits: 0,
+      dds: 0,
+      past_year_committers: [],
+      past_year_total_commits: 0,
+      past_year_total_committers: 0,
+      past_year_total_bot_commits: 0,
+      past_year_total_bot_committers: 0,
+      past_year_mean_commits: 0,
+      past_year_dds: 0,
+      last_synced_at: Time.current
     }
   end
 
@@ -854,10 +881,10 @@ class Repository < ApplicationRecord
       # Quick check: if we already have all commits, we're done (unless force is true)
       if existing_count >= total_repo_commits && !force
         # Just update the last_synced_commit to current HEAD
-        head_sha = `git #{git_dir_arg(repo_dir)} rev-parse HEAD`.strip
-        if head_sha.present?
+        head_sha, _error, head_status = git_command(*git_dir_args(repo_dir), 'rev-parse', 'HEAD')
+        if head_status.success? && head_sha.strip.present?
           update_columns(
-            last_synced_commit: head_sha,
+            last_synced_commit: head_sha.strip,
             last_synced_at: Time.current
           )
         end
@@ -1198,9 +1225,8 @@ class Repository < ApplicationRecord
   
   def count_commits_in_repo(dir)
     # Use rev-list --count which is VERY fast
-    git_cmd = ["git"] + git_dir_args(dir) + ["rev-list", "--count", "HEAD"]
-    output = `#{git_cmd.join(' ')}`.strip
-    output.to_i
+    output, _error, status = git_command(*git_dir_args(dir), 'rev-list', '--count', 'HEAD')
+    status.success? ? output.strip.to_i : 0
   rescue => e
     Rails.logger.error "Failed to count commits: #{e.message}"
     0

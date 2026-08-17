@@ -70,6 +70,19 @@ class ApiV1CommitsControllerTest < ActionDispatch::IntegrationTest
     assert_response :not_found
   end
 
+  test 'do not create a repository for an incomplete repository path' do
+    SyncRepositoryWorker.expects(:perform_async).never
+
+    assert_no_difference -> { @host.repositories.count } do
+      get api_v1_host_repository_commits_path(
+        host_id: @host.name,
+        repository_id: 'owner'
+      )
+    end
+
+    assert_response :not_found
+  end
+
   test 'redirect uppercase host names to lowercase' do
     get api_v1_host_repository_commits_path(host_id: @host.name.upcase, repository_id: @repository.full_name)
     assert_response :moved_permanently
