@@ -56,6 +56,22 @@ class RepositoryTest < ActiveSupport::TestCase
     )
   end
 
+  test "sync_pending? is true before a repository produces a commit count" do
+    assert_predicate @repository, :sync_pending?
+  end
+
+  test "sync_pending? is false for a synced repository with no commits" do
+    @repository.update!(total_commits: 0)
+
+    refute_predicate @repository, :sync_pending?
+  end
+
+  test "sync_pending? is false for a repository with a terminal status" do
+    @repository.update!(status: 'not_found')
+
+    refute_predicate @repository, :sync_pending?
+  end
+
   # Timeout tests
   test "sync_commits handles timeout properly" do
     @repository.stubs(:fetch_commits).raises(Timeout::Error)
