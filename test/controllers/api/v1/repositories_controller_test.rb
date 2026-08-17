@@ -39,6 +39,18 @@ class ApiV1RepositoriesControllerTest < ActionDispatch::IntegrationTest
     assert_equal actual_response["full_name"], @repository.full_name
   end
 
+  test 'get a repository returns accepted while it is pending' do
+    repository = @host.repositories.create!(full_name: 'owner/pending-repo')
+
+    get api_v1_host_repository_path(host_id: @host.name, id: repository.full_name)
+
+    assert_response :accepted
+    response_json = JSON.parse(response.body)
+    assert_equal 'pending', response_json['status']
+    assert_equal api_v1_host_repository_url(@host, repository), response_json['repository_url']
+    assert_equal '60', response.headers['Retry-After']
+  end
+
   test 'redirect uppercase host names to lowercase for repository show' do
     get api_v1_host_repository_path(host_id: @host.name.upcase, id: @repository.full_name)
     assert_response :moved_permanently
@@ -55,6 +67,31 @@ class ApiV1RepositoriesControllerTest < ActionDispatch::IntegrationTest
   test 'lookup a repository for a host' do
     get api_v1_repositories_lookup_path(url: 'https://github.com/ecosyste-ms/repos/')
     assert_response :redirect
+  end
+
+  test 'lookup returns accepted for a repository that has not synced' do
+    repository = @host.repositories.create!(full_name: 'owner/pending-repo')
+    SyncRepositoryWorker.expects(:perform_async).with(repository.id).returns('job-id')
+
+    get api_v1_repositories_lookup_path(url: 'https://github.com/owner/pending-repo')
+
+    assert_response :accepted
+    response_json = JSON.parse(response.body)
+    assert_equal 'pending', response_json['status']
+    assert_equal api_v1_host_repository_url(@host, repository), response_json['repository_url']
+    assert_equal api_v1_host_repository_commits_url(@host, repository), response_json['commits_url']
+    assert_equal '60', response.headers['Retry-After']
+    assert_includes response.headers['Cache-Control'], 'no-store'
+  end
+
+  test 'lookup creates an unknown repository and returns accepted' do
+    SyncRepositoryWorker.expects(:perform_async).with(kind_of(Integer)).returns('job-id')
+
+    get api_v1_repositories_lookup_path(url: 'https://github.com/owner/new-repo')
+
+    assert_response :accepted
+    repository = @host.repositories.find_by!(full_name: 'owner/new-repo')
+    assert_equal api_v1_host_repository_url(@host, repository), JSON.parse(response.body)['repository_url']
   end
 
   test 'lookup a repository using git@ SSH format' do
@@ -81,6 +118,17 @@ class ApiV1RepositoriesControllerTest < ActionDispatch::IntegrationTest
   test 'lookup a repository with hidden owner returns 404' do
     Owner.create!(host: @host, login: 'ecosyste-ms', hidden: true)
     get api_v1_repositories_lookup_path(url: 'https://github.com/ecosyste-ms/repos/')
+    assert_response :not_found
+  end
+
+  test 'lookup does not create a repository for a hidden owner' do
+    Owner.create!(host: @host, login: 'hidden-owner', hidden: true)
+    SyncRepositoryWorker.expects(:perform_async).never
+
+    assert_no_difference -> { @host.repositories.count } do
+      get api_v1_repositories_lookup_path(url: 'https://github.com/hidden-owner/new-repo')
+    end
+
     assert_response :not_found
   end
 

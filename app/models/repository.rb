@@ -168,6 +168,10 @@ class Repository < ApplicationRecord
     SyncRepositoryWorker.perform_async(id)
   end
 
+  def sync_pending?
+    status.nil? && total_commits.nil?
+  end
+
   def sync_details
     conn = Faraday.new(repos_api_url) do |f|
       f.request :json

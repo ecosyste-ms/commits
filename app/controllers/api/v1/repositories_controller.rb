@@ -57,17 +57,23 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
       if @repository.last_synced_at.blank? || @repository.last_synced_at < 1.day.ago
         @repository.sync_async(request.remote_ip)
       end
+      return render_pending_repository(@repository) if @repository.sync_pending?
+
       fresh_when @repository, public: true
       redirect_to api_v1_host_repository_path(@host, @repository)
     else
-      @host.sync_repository_async(path, request.remote_ip)
-      render json: { message: "Repository syncing started." }, status: :accepted
+      @repository = @host.sync_repository_async(path, request.remote_ip)
+      raise ActiveRecord::RecordNotFound unless @repository
+
+      render_pending_repository(@repository)
     end
   end
 
   def show
     @repository = @host.repositories.find_by!('lower(full_name) = ?', params[:id].downcase)
     raise ActiveRecord::RecordNotFound if @repository.owner_hidden?
+    return render_pending_repository(@repository) if @repository.sync_pending?
+
     fresh_when @repository, public: true
 
     # Load hidden committers for this repository in one query

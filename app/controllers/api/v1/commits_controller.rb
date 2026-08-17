@@ -2,7 +2,15 @@ class Api::V1::CommitsController < Api::V1::ApplicationController
   before_action :find_host
 
   def index
-    @repository = @host.repositories.find_by!('lower(full_name) = ?', params[:repository_id].downcase)
+    owner = params[:repository_id].split('/').first
+    raise ActiveRecord::RecordNotFound if @host.owner_hidden?(owner)
+
+    @repository = Repository.find_or_create_from_host(@host, params[:repository_id])
+
+    if @repository.sync_pending?
+      @repository.sync_async(request.remote_ip)
+      return render_pending_repository(@repository)
+    end
 
     scope = @repository.commits.order('timestamp DESC')
 
