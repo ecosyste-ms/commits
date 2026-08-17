@@ -855,6 +855,24 @@ Co-authored-by: Second <second@example.com>" 2>&1`
     end
   end
 
+  test "sync_all records zero counts for an empty repository" do
+    Dir.mktmpdir do |source_dir|
+      `git init #{source_dir} 2>&1`
+
+      @repository.stubs(:git_clone_url).returns(source_dir)
+      @repository.stubs(:fetch_head_sha).returns(nil)
+
+      @repository.sync_all
+
+      @repository.reload
+      assert_equal 0, @repository.total_commits
+      assert_equal 0, @repository.total_committers
+      assert_equal [], @repository.committers
+      assert_not_nil @repository.last_synced_at
+      refute_predicate @repository, :sync_pending?
+    end
+  end
+
   test "sync_commits_batch gets correct co-author data" do
     @repository.commits.delete_all
     
@@ -886,6 +904,20 @@ Co-authored-by: Claude <noreply@anthropic.com>" 2>&1`
     Dir.mktmpdir do |dir|
       result = @repository.count_commits_internal(dir)
       assert_equal({}, result)
+    end
+  end
+
+  test "count_commits_internal returns zero counts for an empty git repository" do
+    Dir.mktmpdir do |dir|
+      `git init #{dir} 2>&1`
+
+      result = @repository.count_commits_internal(dir)
+
+      assert_equal 0, result[:total_commits]
+      assert_equal 0, result[:total_committers]
+      assert_equal [], result[:committers]
+      assert_equal 0, result[:past_year_total_commits]
+      assert_equal [], result[:past_year_committers]
     end
   end
 

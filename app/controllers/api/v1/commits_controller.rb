@@ -2,7 +2,10 @@ class Api::V1::CommitsController < Api::V1::ApplicationController
   before_action :find_host
 
   def index
-    owner = params[:repository_id].split('/').first
+    repository_parts = params[:repository_id].split('/', -1)
+    raise ActiveRecord::RecordNotFound if repository_parts.size < 2 || repository_parts.any?(&:blank?)
+
+    owner = repository_parts.first
     raise ActiveRecord::RecordNotFound if @host.owner_hidden?(owner)
 
     @repository = Repository.find_or_create_from_host(@host, params[:repository_id])
