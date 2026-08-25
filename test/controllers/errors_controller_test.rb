@@ -15,9 +15,11 @@ class ErrorsControllerTest < ActionDispatch::IntegrationTest
     assert_template 'errors/unprocessable'
   end
 
-  test 'renders 500' do
+  test 'renders 500 without caching it' do
     get '/500'
     assert_response :internal_server_error
     assert_template 'errors/internal'
+    assert_equal 'no-store', response.headers['Cache-Control']
+    assert_nil response.headers['CDN-Cache-Control']
   end
 end
