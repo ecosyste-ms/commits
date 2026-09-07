@@ -871,6 +871,40 @@ Co-authored-by: Second <second@example.com>" 2>&1`
     end
   end
 
+  test "sync_details fetches repo metadata via the lookup endpoint" do
+    stub_request(:get, "https://repos.ecosyste.ms/api/v1/repositories/lookup?url=https://github.com/test/repo")
+      .to_return(status: 200, headers: {'Content-Type' => 'application/json'}, body: {
+        status: nil, default_branch: 'main', description: 'desc',
+        stargazers_count: 5, fork: false, archived: false,
+        icon_url: 'https://example.com/icon.png', size: 1234
+      }.to_json)
+
+    @repository.sync_details
+
+    @repository.reload
+    assert_equal 'main', @repository.default_branch
+    assert_equal 5, @repository.stargazers_count
+    assert_equal 1234, @repository.size
+  end
+
+  test "sync_details marks not_found on 404" do
+    stub_request(:get, "https://repos.ecosyste.ms/api/v1/repositories/lookup?url=https://github.com/test/repo")
+      .to_return(status: 404, headers: {'Content-Type' => 'application/json'}, body: {error: 'not found'}.to_json)
+
+    @repository.sync_details
+
+    assert_equal 'not_found', @repository.reload.status
+  end
+
+  test "sync_details ignores non-hash responses" do
+    stub_request(:get, "https://repos.ecosyste.ms/api/v1/repositories/lookup?url=https://github.com/test/repo")
+      .to_return(status: 200, headers: {'Content-Type' => 'application/json'}, body: '[{"name":"v1.0"}]')
+
+    assert_nothing_raised { @repository.sync_details }
+
+    assert_nil @repository.reload.size
+  end
+
   test "sync_all skips too_large repositories before cloning" do
     @repository.stubs(:sync_details)
     @repository.stubs(:too_large?).returns(true)

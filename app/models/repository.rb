@@ -194,6 +194,7 @@ class Repository < ApplicationRecord
     end
     return if response.status != 200
     json = response.body
+    return unless json.is_a?(Hash)
 
     self.status = json['status']
     self.default_branch = json['default_branch']
@@ -211,7 +212,7 @@ class Repository < ApplicationRecord
   end
 
   def repos_api_url
-    "https://repos.ecosyste.ms/api/v1/hosts/#{host.name}/repositories/#{full_name}"
+    "https://repos.ecosyste.ms/api/v1/repositories/lookup?url=#{CGI.escape(html_url)}"
   end
 
   def folder_name
