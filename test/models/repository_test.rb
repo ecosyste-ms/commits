@@ -9,6 +9,12 @@ class RepositoryTest < ActiveSupport::TestCase
 
   context 'validations' do
     should validate_presence_of(:full_name)
+    should allow_value('owner/repo').for(:full_name)
+    should allow_value('group/sub/project').for(:full_name)
+    should_not allow_value('bareowner').for(:full_name).on(:create)
+    should_not allow_value('tj%2Fasset').for(:full_name).on(:create)
+    should_not allow_value('a/b, https://github.com/c/d').for(:full_name).on(:create)
+    should_not allow_value('https://github.com/a/b').for(:full_name).on(:create)
   end
 
   context '.sync_least_recently_synced' do
@@ -413,6 +419,14 @@ class RepositoryTest < ActiveSupport::TestCase
     end
   end
 
+  test "find_or_create_from_host returns nil for malformed full_name" do
+    assert_no_difference 'Repository.count' do
+      assert_nil Repository.find_or_create_from_host(@host, "bareowner")
+      assert_nil Repository.find_or_create_from_host(@host, "foo%2Fbar")
+      assert_nil Repository.find_or_create_from_host(@host, "a/b, https://x/y")
+    end
+  end
+
   test "find_or_create_from_host is case insensitive" do
     existing_repo = @host.repositories.create!(full_name: "CaseSensitive/Repo")
     
@@ -509,6 +523,30 @@ class RepositoryTest < ActiveSupport::TestCase
       assert_match(/appears to be deleted or private/, error.message)
       assert_equal 'not_found', @repository.reload.status
     end
+  end
+
+  test "clone_repository marks repository as not_found on remote: Not Found" do
+    Dir.mktmpdir do |dir|
+      @repository.stubs(:git_command).with('clone', '--filter=blob:none', '--no-checkout', '--single-branch', '--quiet', @repository.git_clone_url, anything).returns(
+        ["", "remote: Not Found\nfatal: repository 'https://github.com/test/repo.git/' not found", stub(success?: false)]
+      )
+
+      error = assert_raises(Repository::CloneError) do
+        @repository.clone_repository(dir)
+      end
+
+      refute_kind_of Repository::TransientCloneError, error
+      assert_match(/appears to be deleted or private/, error.message)
+      assert_equal 'not_found', @repository.reload.status
+    end
+  end
+
+  test "should_skip_sync? marks repository invalid when full_name is malformed" do
+    @repository.update_column(:full_name, 'a/b, https://github.com/c/d')
+
+    assert @repository.should_skip_sync?
+    assert_equal 'invalid', @repository.reload.status
+    assert_not_nil @repository.last_synced_at
   end
 
   test "clone_repository raises transient CloneError for other failures" do

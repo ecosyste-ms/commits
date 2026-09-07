@@ -191,4 +191,11 @@ class ApiV1RepositoriesControllerTest < ActionDispatch::IntegrationTest
     # Check that visible committer is in the response
     assert_includes actual_response['past_year_committers'].map { |c| c['login'] }, "janesmith"
   end
+
+  test 'ping with malformed full_name returns 404 and creates nothing' do
+    assert_no_difference 'Repository.count' do
+      get ping_api_v1_host_repository_path(host_id: @host.name, id: 'bareowner')
+    end
+    assert_response :not_found
+  end
 end

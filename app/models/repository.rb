@@ -28,7 +28,10 @@ class Repository < ApplicationRecord
   has_many :committer_list, through: :contributions, source: :committer
   # has_many :committers, through: :contributions
 
+  VALID_FULL_NAME = %r{\A[^\s,%:]+(/[^\s,%:]+)+\z}
+
   validates :full_name, presence: true
+  validates :full_name, format: { with: VALID_FULL_NAME }, on: :create
 
   scope :active, -> { where(status: nil) }
   scope :visible, -> { active.where.not(last_synced_at: nil).where.not(total_commits: nil) }
@@ -68,6 +71,7 @@ class Repository < ApplicationRecord
   end
 
   def self.find_or_create_from_host(host, full_name)
+    return nil unless full_name.present? && full_name.match?(VALID_FULL_NAME)
     host.repositories.find_by('lower(full_name) = ?', full_name.downcase) ||
       host.repositories.create!(full_name: full_name)
   end
@@ -284,11 +288,13 @@ class Repository < ApplicationRecord
     unless status.success?
       full_output = [output, error].compact.join("\n")
       # Check if the repository has been deleted from GitHub or is private
-      if full_output.include?("could not read Username") || 
-         full_output.include?("Repository not found") || 
+      if full_output.include?("could not read Username") ||
+         full_output.include?("Repository not found") ||
          full_output.include?("Authentication failed") ||
          full_output.include?("terminal prompts disabled") ||
-         full_output.include?("Permission denied")
+         full_output.include?("Permission denied") ||
+         full_output.include?("remote: Not Found") ||
+         full_output.match?(/repository '.*' not found/)
         update_column(:status, 'not_found')
         raise CloneError, "Repository #{full_name} appears to be deleted or private"
       end
@@ -316,7 +322,15 @@ class Repository < ApplicationRecord
     count_refs > 1000 || (size.present? && size > 500_000)
   end
 
+  def full_name_valid?
+    full_name.present? && full_name.match?(VALID_FULL_NAME)
+  end
+
   def should_skip_sync?
+    unless full_name_valid?
+      update_columns(status: 'invalid', last_synced_at: Time.now)
+      return true
+    end
     sync_details
     if too_large?
       update_columns(status: 'too_large', last_synced_at: Time.now)

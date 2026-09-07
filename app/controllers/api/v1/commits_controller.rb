@@ -9,6 +9,7 @@ class Api::V1::CommitsController < Api::V1::ApplicationController
     raise ActiveRecord::RecordNotFound if @host.owner_hidden?(owner)
 
     @repository = Repository.find_or_create_from_host(@host, params[:repository_id])
+    raise ActiveRecord::RecordNotFound unless @repository
 
     if @repository.sync_pending?
       @repository.sync_async(request.remote_ip)
