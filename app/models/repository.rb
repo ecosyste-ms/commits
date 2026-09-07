@@ -277,10 +277,9 @@ class Repository < ApplicationRecord
   def clone_repository(dir)
     # Clone into a subdirectory to keep the structure clean
     repo_path = File.join(dir, "repo")
-    # Use --filter=blob:none to skip file contents (we only need commit history)
-    # Use --single-branch since we only fetch commits from HEAD anyway
-    
-    output, error, status = git_command('clone', '--filter=blob:none', '--single-branch', '--quiet', git_clone_url, repo_path)
+    # --filter=blob:none + --no-checkout: we only read commit metadata (log/shortlog),
+    # so skip blob fetch and working-tree write entirely
+    output, error, status = git_command('clone', '--filter=blob:none', '--no-checkout', '--single-branch', '--quiet', git_clone_url, repo_path)
     
     unless status.success?
       full_output = [output, error].compact.join("\n")
@@ -319,7 +318,10 @@ class Repository < ApplicationRecord
 
   def should_skip_sync?
     sync_details
-    return true if too_large?
+    if too_large?
+      update_columns(status: 'too_large', last_synced_at: Time.now)
+      return true
+    end
     if status == 'not_found'
       # Update last_synced_at even for not_found repos to avoid repeated attempts
       update_column(:last_synced_at, Time.now)
@@ -330,12 +332,11 @@ class Repository < ApplicationRecord
 
   def sync_all(force: false)
     return if owner_hidden?
-    # TEMPORARILY DISABLED - all skipping disabled to ensure repos get synced
-    # if should_skip_sync?
-    #   Rails.logger.info "Skipping sync for #{full_name} - should_skip_sync returned true"
-    #   return
-    # end
-    
+    if should_skip_sync?
+      Rails.logger.info "Skipping sync for #{full_name} - should_skip_sync returned true"
+      return
+    end
+
     # Automatically force sync if repository was last synced before multi-line commit message fix
     if last_synced_at.present? && last_synced_at < MULTILINE_FIX_TIME
       Rails.logger.info "Forcing full sync for #{full_name} due to multi-line commit message fix"

@@ -482,7 +482,7 @@ class RepositoryTest < ActiveSupport::TestCase
   test "clone_repository marks repository as not_found when deleted from GitHub" do
     Dir.mktmpdir do |dir|
       # Stub the git clone command to simulate a deleted repository error
-      @repository.stubs(:git_command).with('clone', '--filter=blob:none', '--single-branch', '--quiet', @repository.git_clone_url, anything).returns(
+      @repository.stubs(:git_command).with('clone', '--filter=blob:none', '--no-checkout', '--single-branch', '--quiet', @repository.git_clone_url, anything).returns(
         ["", "fatal: could not read Username for 'https://github.com': No such device or address", stub(success?: false)]
       )
       
@@ -514,7 +514,7 @@ class RepositoryTest < ActiveSupport::TestCase
   test "clone_repository raises transient CloneError for other failures" do
     Dir.mktmpdir do |dir|
       # Stub the git clone command to simulate a different error
-      @repository.stubs(:git_command).with('clone', '--filter=blob:none', '--single-branch', '--quiet', @repository.git_clone_url, anything).returns(
+      @repository.stubs(:git_command).with('clone', '--filter=blob:none', '--no-checkout', '--single-branch', '--quiet', @repository.git_clone_url, anything).returns(
         ["", "fatal: unable to access 'https://github.com/test/repo.git/': Connection timed out", stub(success?: false)]
       )
       
@@ -833,8 +833,21 @@ Co-authored-by: Second <second@example.com>" 2>&1`
     end
   end
 
+  test "sync_all skips too_large repositories before cloning" do
+    @repository.stubs(:sync_details)
+    @repository.stubs(:too_large?).returns(true)
+    @repository.expects(:clone_repository).never
+
+    @repository.sync_all
+
+    @repository.reload
+    assert_equal 'too_large', @repository.status
+    assert_not_nil @repository.last_synced_at
+  end
+
   test "sync_all clears stale status after a successful sync" do
     @repository.update!(status: 'too_large', last_synced_at: nil)
+    @repository.stubs(:should_skip_sync?).returns(false)
     @repository.stubs(:fetch_head_sha).returns('abc123')
     @repository.stubs(:clone_repository)
     @repository.stubs(:count_commits_internal).returns(total_commits: 1, total_committers: 1)
@@ -849,6 +862,7 @@ Co-authored-by: Second <second@example.com>" 2>&1`
   end
 
   test "sync_all reraises transient clone errors for Sidekiq" do
+    @repository.stubs(:should_skip_sync?).returns(false)
     @repository.stubs(:fetch_head_sha).returns(nil)
     @repository.stubs(:clone_repository).raises(
       Repository::TransientCloneError,
@@ -896,6 +910,7 @@ Co-authored-by: Second <second@example.com>" 2>&1`
       `git init #{source_dir} 2>&1`
 
       @repository.stubs(:git_clone_url).returns(source_dir)
+      @repository.stubs(:should_skip_sync?).returns(false)
       @repository.stubs(:fetch_head_sha).returns(nil)
 
       @repository.sync_all
