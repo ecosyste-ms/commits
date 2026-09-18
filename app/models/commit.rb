@@ -1,4 +1,13 @@
 class Commit < ApplicationRecord
+  def self.sortable_columns
+    {
+      'timestamp' => 'timestamp',
+      'sha' => 'sha',
+      'author' => 'author',
+      'committer' => 'committer',
+    }
+  end
+
   belongs_to :repository
   has_one :host, through: :repository
 
