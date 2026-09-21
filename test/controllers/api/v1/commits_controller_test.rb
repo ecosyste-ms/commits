@@ -17,6 +17,59 @@ class ApiV1CommitsControllerTest < ActionDispatch::IntegrationTest
     assert_equal actual_response.length, 1
   end
 
+  test 'sort commits by an allowed field and direction' do
+    older_commit = @repository.commits.create!(
+      sha: 'older',
+      timestamp: 1.day.ago,
+      author: 'author',
+      message: 'older message'
+    )
+
+    get api_v1_host_repository_commits_path(
+      host_id: @host.name,
+      repository_id: @repository.full_name,
+      sort: 'timestamp',
+      order: 'asc'
+    )
+
+    assert_response :success
+    assert_equal [older_commit.sha, @commit.sha], response.parsed_body.pluck('sha')
+  end
+
+  test 'fall back to default sorting for a malformed sort parameter' do
+    older_commit = @repository.commits.create!(
+      sha: 'older',
+      timestamp: 1.day.ago,
+      author: 'author',
+      message: 'older message'
+    )
+    path = api_v1_host_repository_commits_path(host_id: @host.name, repository_id: @repository.full_name)
+
+    get "#{path}?sort=timestamp%26order=asc"
+
+    assert_response :success
+    assert_equal [@commit.sha, older_commit.sha], response.parsed_body.pluck('sha')
+  end
+
+  test 'fall back to descending order for an invalid direction' do
+    older_commit = @repository.commits.create!(
+      sha: 'older',
+      timestamp: 1.day.ago,
+      author: 'author',
+      message: 'older message'
+    )
+
+    get api_v1_host_repository_commits_path(
+      host_id: @host.name,
+      repository_id: @repository.full_name,
+      sort: 'timestamp',
+      order: 'sideways'
+    )
+
+    assert_response :success
+    assert_equal [@commit.sha, older_commit.sha], response.parsed_body.pluck('sha')
+  end
+
   test 'return accepted and start syncing for an unknown repository' do
     SyncRepositoryWorker.expects(:perform_async).with(kind_of(Integer)).returns('job-id')
 
