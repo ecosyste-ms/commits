@@ -1597,12 +1597,31 @@ class Repository < ApplicationRecord
   def committer_records
     return [] if committers.nil?
     grouped_committers = committers.map do |committer|
-      next unless committer['login'].present? || committer['email'].present?
+      login = committer['login'].presence
+      email = committer['email'].presence
+      next if login.blank? && email.blank?
     
-      c = host.committers.find_by(login: committer['login']) if committer['login'].present?
-      c ||= host.committers.email(committer['email']).to_a.first
+      c = host.committers.find_by(login: login) if login.present?
+      c ||= host.committers.email(email).to_a.first if email.present?
+
+      if c.nil?
+        begin
+          c = if login.present?
+                host.committers.create_or_find_by(login: login) do |com|
+                  com.emails = [email].compact
+                end
+              else
+                host.committers.create(emails: [email].compact)
+              end
+        rescue ActiveRecord::RecordNotUnique
+          c = host.committers.find_by(login: login) if login.present?
+          c ||= host.committers.email(email).to_a.first if email.present?
+        end
+      elsif email.present? && !c.emails.to_a.include?(email)
+        c.update(emails: (c.emails.to_a + [email]).uniq)
+      end
     
-      next unless c
+      next unless c&.persisted?
     
       { committer_id: c.id, commit_count: committer['count'] }
     end.compact

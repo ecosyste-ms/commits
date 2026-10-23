@@ -94,4 +94,27 @@ class CommitterDedupeTest < ActiveSupport::TestCase
     assert_includes existing.emails, 'new@x.com'
     assert_equal 1, Committer.where(host: @host, login: 'racer').count
   end
+
+  test 'committer_records creates records for every committer, including those without a login' do
+    repo = create(:repository, host: @host, committers: [
+      { 'login' => 'alice', 'email' => 'alice@example.com', 'count' => 5 },
+      { 'login' => nil, 'email' => 'bob@example.com', 'count' => 3 },
+      { 'login' => '', 'email' => 'carol@example.com', 'count' => 2 }
+    ])
+
+    records = repo.committer_records
+    assert_equal 3, records.length
+
+    alice = Committer.find_by(host: @host, login: 'alice')
+    assert alice
+    assert_includes alice.emails, 'alice@example.com'
+
+    bob = Committer.where(host: @host, login: nil).email('bob@example.com').first
+    assert bob
+    assert_includes bob.emails, 'bob@example.com'
+
+    carol = Committer.where(host: @host, login: nil).email('carol@example.com').first
+    assert carol
+    assert_includes carol.emails, 'carol@example.com'
+  end
 end

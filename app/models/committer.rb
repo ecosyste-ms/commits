@@ -84,12 +84,18 @@ class Committer < ApplicationRecord
     updated = 0
     Repository.where.not(committers: nil).select(:id, :host_id, :committers).find_in_batches(batch_size: batch_size) do |batch|
       pairs = Hash.new { |h, k| h[k] = [] }
+      no_login_emails = Hash.new { |h, k| h[k] = Set.new }
+
       batch.each do |r|
         Array(r.committers).each do |entry|
           login = entry['login']
           email = entry['email']
-          next if login.blank? || email.blank?
-          pairs[[r.host_id, login]] << email
+          next if email.blank?
+          if login.present?
+            pairs[[r.host_id, login]] << email
+          else
+            no_login_emails[r.host_id] << email
+          end
         end
       end
       pairs.each do |(host_id, login), emails|
@@ -105,6 +111,18 @@ class Committer < ApplicationRecord
           committer.update!(emails: (committer.emails.to_a + emails).uniq)
         end
         updated += 1
+      end
+      no_login_emails.each do |host_id, emails|
+        emails.each do |email|
+          existing = where(host_id: host_id).email(email).first
+          next if existing
+          begin
+            create!(host_id: host_id, login: nil, emails: [email])
+            updated += 1
+          rescue ActiveRecord::RecordNotUnique
+            # Handled by unique constraint or concurrent insert
+          end
+        end
       end
       seen += batch.size
       puts "committers:backfill_emails processed #{seen} repositories, #{updated} committers updated"
