@@ -905,16 +905,25 @@ Co-authored-by: Second <second@example.com>" 2>&1`
     assert_nil @repository.reload.size
   end
 
-  test "sync_all skips too_large repositories before cloning" do
-    @repository.stubs(:sync_details)
-    @repository.stubs(:too_large?).returns(true)
-    @repository.expects(:clone_repository).never
+  test "sync_all syncs large repositories previously marked too_large" do
+    Dir.mktmpdir do |source_dir|
+      `git init #{source_dir} 2>&1`
+      File.write("#{source_dir}/file.txt", "content")
+      `cd #{source_dir} && git add . && git -c user.name="Test" -c user.email="test@test.com" commit -m "Initial commit" 2>&1`
 
-    @repository.sync_all
+      @repository.update!(status: 'too_large', size: 6_731_667)
+      @repository.stubs(:sync_details)
+      @repository.stubs(:fetch_head_sha).returns("abc123")
+      @repository.stubs(:clone_repository).with(anything) do |dir|
+        `git clone #{source_dir} #{File.join(dir, "repo")} 2>&1`
+      end
 
-    @repository.reload
-    assert_equal 'too_large', @repository.status
-    assert_not_nil @repository.last_synced_at
+      @repository.sync_all
+
+      @repository.reload
+      assert_nil @repository.status
+      assert_equal 1, @repository.total_commits
+    end
   end
 
   test "sync_all clears stale status after a successful sync" do
@@ -959,7 +968,6 @@ Co-authored-by: Second <second@example.com>" 2>&1`
       @repository.stubs(:git_clone_url).returns(source_dir)
       @repository.stubs(:fetch_head_sha).returns("abc123")
       @repository.stubs(:sync_details).returns(nil)
-      @repository.stubs(:too_large?).returns(false)
       
       @repository.stubs(:clone_repository).with(anything) do |dir|
         repo_path = File.join(dir, "repo")
