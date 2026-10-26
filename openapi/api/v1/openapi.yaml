@@ -330,6 +330,9 @@ components:
           format: date-time
         last_synced_commit:
           type: string
+        status:
+          type: [string, "null"]
+          description: Null when stats are current. too_large, not_found or invalid when sync is skipped and stats are not updated.
         updated_at:
           type: string
           format: date-time

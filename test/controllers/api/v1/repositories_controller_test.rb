@@ -39,6 +39,15 @@ class ApiV1RepositoriesControllerTest < ActionDispatch::IntegrationTest
     assert_equal actual_response["full_name"], @repository.full_name
   end
 
+  test 'get a repository includes status when sync is skipped' do
+    @repository.update!(status: 'too_large')
+
+    get api_v1_host_repository_path(host_id: @host.name, id: @repository.full_name)
+
+    assert_response :success
+    assert_equal 'too_large', JSON.parse(@response.body)['status']
+  end
+
   test 'get a repository returns accepted while it is pending' do
     repository = @host.repositories.create!(full_name: 'owner/pending-repo')
 

@@ -305,24 +305,6 @@ class Repository < ApplicationRecord
 
   # TODO support hg and svn repos
 
-  def count_refs
-    output, error, status = git_command('ls-remote', '--heads', '--tags', git_clone_url)
-    
-    unless status.success?
-      Rails.logger.error "Failed to count refs for #{full_name}: #{error}"
-      return 0
-    end
-    
-    output.lines.count
-  rescue => e
-    Rails.logger.error "Failed to count refs for #{full_name}: #{e.message}"
-    0
-  end
-
-  def too_large?
-    count_refs > 1000 || (size.present? && size > 500_000)
-  end
-
   def full_name_valid?
     full_name.present? && full_name.match?(VALID_FULL_NAME)
   end
@@ -333,10 +315,6 @@ class Repository < ApplicationRecord
       return true
     end
     sync_details
-    if too_large?
-      update_columns(status: 'too_large', last_synced_at: Time.now)
-      return true
-    end
     if status == 'not_found'
       # Update last_synced_at even for not_found repos to avoid repeated attempts
       update_column(:last_synced_at, Time.now)
