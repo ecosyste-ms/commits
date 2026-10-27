@@ -874,9 +874,11 @@ class Repository < ApplicationRecord
     end
   end
   
-  # forks mostly repeat their parent's history; totals are still counted from the clone
+  # forks repeat their parent's history and huge single-author repos are generated data;
+  # totals are still counted from the clone
   def store_commits?
-    !fork?
+    return false if fork?
+    !(total_commits.to_i > 50_000 && total_committers.to_i <= 10 && dds && dds < 0.1)
   end
 
   def sync_commits_batch(repo_dir, force: false)

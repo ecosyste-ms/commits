@@ -10,7 +10,7 @@ Documentation for the REST API is available here: [https://commits.ecosyste.ms/d
 
 The default rate limit for the API is 5000/req per hour based on your IP address, get in contact if you need to to increase your rate limit.
 
-Forks get commit and committer totals, but their individual commits are not stored, so the commits list for a fork is empty.
+Forks get commit and committer totals, but their individual commits are not stored, so the commits list for a fork is empty. The same applies to repositories with over 50,000 commits, 10 or fewer committers and a development distribution score below 0.1, which are almost always generated data such as proxy lists or status logs.
 
 ## Development
 

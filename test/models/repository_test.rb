@@ -949,6 +949,27 @@ Co-authored-by: Second <second@example.com>" 2>&1`
     end
   end
 
+  test "sync_all keeps totals for large single-author repos without storing their commits" do
+    Dir.mktmpdir do |source_dir|
+      `git init #{source_dir} 2>&1`
+      File.write("#{source_dir}/file.txt", "content")
+      `cd #{source_dir} && git add . && git -c user.name="Test" -c user.email="test@test.com" commit -m "Initial commit" 2>&1`
+      @repository.stubs(:sync_details)
+      @repository.stubs(:fetch_head_sha).returns("abc123")
+      @repository.stubs(:clone_repository).with(anything) do |dir|
+        `git clone #{source_dir} #{File.join(dir, "repo")} 2>&1`
+      end
+
+      @repository.stubs(:count_commits_internal).returns(total_commits: 60_000, total_committers: 2, dds: 0.01)
+      @repository.sync_all
+      assert_equal [60_000, 0], [@repository.reload.total_commits, @repository.commits.count]
+
+      @repository.stubs(:count_commits_internal).returns(total_commits: 60_000, total_committers: 200, dds: 0.6)
+      @repository.sync_all
+      assert_equal 1, @repository.reload.commits.count
+    end
+  end
+
   test "sync_all clears stale status after a successful sync" do
     @repository.update!(status: 'too_large', last_synced_at: nil)
     @repository.stubs(:should_skip_sync?).returns(false)
