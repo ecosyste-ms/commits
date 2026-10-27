@@ -7,6 +7,22 @@ class HostsControllerTest < ActionDispatch::IntegrationTest
     @host_with_repos = create(:host, :with_repositories, name: "TestHost", repositories_count: 5, commits_count: 100)
   end
 
+  test 'renders the shared services menu without surrounding link whitespace' do
+    https!
+    get root_path, headers: { 'HTTP_HOST' => 'commits.ecosyste.ms' }
+    assert_response :success
+
+    services = HostsController.helpers.ecosystems_services.values.flatten
+    assert_select '#header__global__menu', count: 1
+    assert_select '#header__global__menu a', count: services.length do |links|
+      services.zip(links).each do |service, link|
+        assert_equal service[:name], link.text
+        assert_equal service[:url], link['href']
+      end
+    end
+    assert_select '#header__global__menu a.active[href="https://commits.ecosyste.ms"]', count: 1
+  end
+
   context "GET #index" do
     should "return success" do
       get hosts_path
