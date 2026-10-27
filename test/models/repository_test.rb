@@ -926,6 +926,29 @@ Co-authored-by: Second <second@example.com>" 2>&1`
     end
   end
 
+  test "sync_all keeps totals for forks without storing their commits" do
+    Dir.mktmpdir do |source_dir|
+      `git init #{source_dir} 2>&1`
+      File.write("#{source_dir}/file.txt", "content")
+      `cd #{source_dir} && git add . && git -c user.name="Test" -c user.email="test@test.com" commit -m "Initial commit" 2>&1`
+      head = `git -C #{source_dir} rev-parse HEAD`.strip
+      @repository.stubs(:sync_details)
+      @repository.stubs(:fetch_head_sha).returns(head)
+      @repository.stubs(:clone_repository).with(anything) do |dir|
+        `git clone #{source_dir} #{File.join(dir, "repo")} 2>&1`
+      end
+
+      @repository.update!(fork: true)
+      @repository.sync_all
+      @repository.reload
+      assert_equal [1, head, 0], [@repository.total_commits, @repository.last_synced_commit, @repository.commits.count]
+
+      @repository.update!(fork: false)
+      @repository.sync_all
+      assert_equal 1, @repository.reload.commits.count
+    end
+  end
+
   test "sync_all clears stale status after a successful sync" do
     @repository.update!(status: 'too_large', last_synced_at: nil)
     @repository.stubs(:should_skip_sync?).returns(false)

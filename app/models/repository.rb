@@ -874,6 +874,11 @@ class Repository < ApplicationRecord
     end
   end
   
+  # forks mostly repeat their parent's history; totals are still counted from the clone
+  def store_commits?
+    !fork?
+  end
+
   def sync_commits_batch(repo_dir, force: false)
     # Sync commits using simple batch pagination
     start_time = Time.now
@@ -888,7 +893,7 @@ class Repository < ApplicationRecord
       existing_count = commits.count
       
       # Quick check: if we already have all commits, we're done (unless force is true)
-      if existing_count >= total_repo_commits && !force
+      if (existing_count >= total_repo_commits && !force) || !store_commits?
         # Just update the last_synced_commit to current HEAD
         head_sha, _error, head_status = git_command(*git_dir_args(repo_dir), 'rev-parse', 'HEAD')
         if head_status.success? && head_sha.strip.present?
