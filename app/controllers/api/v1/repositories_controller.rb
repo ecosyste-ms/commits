@@ -92,8 +92,10 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
   end
 
   def ping
+    raise ActiveRecord::RecordNotFound if @host.owner_hidden?(params[:id].split('/').first)
+
     @repository = Repository.find_or_create_from_host(@host, params[:id])
-    raise ActiveRecord::RecordNotFound if @repository.nil? || @repository.owner_hidden?
+    raise ActiveRecord::RecordNotFound if @repository.nil?
 
     # Skip if recently synced
     if @repository.last_synced_at.blank? || @repository.last_synced_at < 1.day.ago
