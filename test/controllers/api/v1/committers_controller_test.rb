@@ -40,6 +40,18 @@ class Api::V1::CommittersControllerTest < ActionDispatch::IntegrationTest
       assert_response :moved_permanently
     end
 
+    should "return 404 for a hidden committer by login" do
+      @committer.update!(hidden: true)
+      get api_v1_host_committer_path(@host.name, @committer.login)
+      assert_response :not_found
+    end
+
+    should "return 404 for a hidden committer by email" do
+      @committer.update!(hidden: true)
+      get api_v1_host_committer_path(@host.name, @committer.emails.first)
+      assert_response :not_found
+    end
+
     should "return 404 for non-existent committer" do
       get api_v1_host_committer_path(@host.name, "nonexistent")
       assert_response :not_found

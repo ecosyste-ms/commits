@@ -2,7 +2,7 @@ class CommittersController < ApplicationController
   before_action :find_host
 
   def index
-    scope = @host.committers.where('commits_count > 0')
+    scope = @host.committers.visible.where('commits_count > 0')
 
     sort = sanitize_sort(Committer.sortable_columns)
     if params[:order] == 'asc'
@@ -16,9 +16,9 @@ class CommittersController < ApplicationController
   end
 
   def show
-    @committer = @host.committers.find_by(login: params[:id])
+    @committer = @host.committers.visible.find_by(login: params[:id])
     if @committer.nil?
-      @committer = Committer.email(params[:id]).to_a.first
+      @committer = Committer.visible.email(params[:id]).to_a.first
       if @committer && @committer.login.present?
         redirect_to host_committer_path(@host, @committer), status: :moved_permanently
       end

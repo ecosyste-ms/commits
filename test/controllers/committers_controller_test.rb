@@ -47,6 +47,15 @@ class CommittersControllerTest < ActionDispatch::IntegrationTest
       assert_no_match @zero_commits_committer.login, response.body
     end
 
+    should "not list hidden committers" do
+      @committer3.update!(hidden: true)
+      get host_committers_path(@host.name)
+      assert_response :success
+
+      assert_match @committer1.login, response.body
+      assert_no_match @committer3.login, response.body
+    end
+
     should "display commit counts" do
       get host_committers_path(@host.name)
       assert_response :success
@@ -195,6 +204,18 @@ class CommittersControllerTest < ActionDispatch::IntegrationTest
       
       get host_committer_path(@host.name, @committer1.login)
       assert_no_match other_repo.full_name, response.body
+    end
+
+    should "return 404 for a hidden committer by login" do
+      @committer1.update!(hidden: true)
+      get host_committer_path(@host.name, @committer1.login)
+      assert_response :not_found
+    end
+
+    should "return 404 for a hidden committer by email" do
+      @committer1.update!(hidden: true)
+      get host_committer_path(@host.name, @committer1.emails.first)
+      assert_response :not_found
     end
 
     should "return 404 for non-existent committer" do
