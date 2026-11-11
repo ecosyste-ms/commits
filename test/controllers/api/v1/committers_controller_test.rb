@@ -52,6 +52,13 @@ class Api::V1::CommittersControllerTest < ActionDispatch::IntegrationTest
       assert_response :not_found
     end
 
+    should "return 404 for an email that only matches a committer on another host" do
+      other_host = create(:host, name: "gitlab.com")
+      create(:committer, host: other_host, login: nil, emails: ["elsewhere@example.com"])
+      get api_v1_host_committer_path(@host.name, "elsewhere@example.com")
+      assert_response :not_found
+    end
+
     should "return 404 for non-existent committer" do
       get api_v1_host_committer_path(@host.name, "nonexistent")
       assert_response :not_found

@@ -18,7 +18,7 @@ class CommittersController < ApplicationController
   def show
     @committer = @host.committers.visible.find_by(login: params[:id])
     if @committer.nil?
-      @committer = Committer.visible.email(params[:id]).to_a.first
+      @committer = @host.committers.visible.email(params[:id]).to_a.first
       if @committer && @committer.login.present?
         redirect_to host_committer_path(@host, @committer), status: :moved_permanently
       end
