@@ -195,4 +195,52 @@ class HostsControllerTest < ActionDispatch::IntegrationTest
       assert_response :not_found
     end
   end
+
+  context "GET #feed" do
+    should "return an atom feed of visible hosts" do
+      get feed_hosts_path
+      assert_response :success
+      assert_equal 'application/atom+xml', response.media_type
+
+      feed = Nokogiri::XML(response.body)
+      feed.remove_namespaces!
+      assert_equal "Repository Hosts | Ecosyste.ms: Commits", feed.at_xpath('/feed/title').text
+      assert_equal hosts_url, feed.at_xpath('/feed/link[@rel="alternate"]')['href']
+      titles = feed.xpath('/feed/entry/title').map(&:text)
+      assert_includes titles, @host.name
+      assert_includes titles, @host_with_repos.name
+      refute_includes titles, @invisible_host.name
+    end
+
+    should "link each entry to the host page" do
+      get feed_hosts_path
+      assert_response :success
+
+      feed = Nokogiri::XML(response.body)
+      feed.remove_namespaces!
+      entry = feed.xpath('/feed/entry').find { |e| e.at_xpath('title').text == @host.name }
+      assert_equal host_url(@host), entry.at_xpath('link[@rel="alternate"]')['href']
+      assert_match "Repositories: #{@host.repositories_count}", entry.at_xpath('content').text
+    end
+
+    should "order hosts by repositories_count and limit to 20" do
+      create_list(:host, 25, repositories_count: 10, commits_count: 100)
+      top_host = create(:host, name: "TopHost", repositories_count: 10_000, commits_count: 5000)
+
+      get feed_hosts_path
+      assert_response :success
+
+      feed = Nokogiri::XML(response.body)
+      feed.remove_namespaces!
+      entries = feed.xpath('/feed/entry/title').map(&:text)
+      assert_equal 20, entries.length
+      assert_equal top_host.name, entries.first
+    end
+
+    should "be advertised on the hosts page" do
+      get hosts_path
+      assert_response :success
+      assert_select 'link[rel="alternate"][type="application/atom+xml"][href=?]', feed_hosts_url
+    end
+  end
 end

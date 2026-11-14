@@ -250,4 +250,47 @@ class OwnersControllerTest < ActionDispatch::IntegrationTest
       assert_select "title", text: /owner1/
     end
   end
+
+  context "GET #feed" do
+    should "return an atom feed of the owner's repositories" do
+      get feed_host_owner_path(@host.name, "owner1")
+      assert_response :success
+      assert_equal 'application/atom+xml', response.media_type
+
+      feed = Nokogiri::XML(response.body)
+      feed.remove_namespaces!
+      assert_equal "GitHub : owner1 repositories | Ecosyste.ms: Commits", feed.at_xpath('/feed/title').text
+      assert_equal host_owner_url(@host, "owner1"), feed.at_xpath('/feed/link[@rel="alternate"]')['href']
+      assert_equal @owner1_repos.map(&:full_name).sort, feed.xpath('/feed/entry/title').map(&:text).sort
+      assert_equal @owner1_repos.map { |repo| host_repository_url(@host, repo) }.sort, feed.xpath('/feed/entry/link[@rel="alternate"]').map { |link| link['href'] }.sort
+    end
+
+    should "return not modified for a matching etag" do
+      get feed_host_owner_path(@host.name, "owner1")
+      assert_response :success
+      etag = response.headers['ETag']
+      assert etag.present?
+
+      get feed_host_owner_path(@host.name, "owner1"), headers: { 'HTTP_IF_NONE_MATCH' => etag }
+      assert_response :not_modified
+    end
+
+    should "return 404 for hidden owner" do
+      @host.owners.find_by!(login: 'owner1').update!(hidden: true)
+
+      get feed_host_owner_path(@host.name, "owner1")
+      assert_response :not_found
+    end
+
+    should "return 404 for owner without repositories" do
+      get feed_host_owner_path(@host.name, "nobody")
+      assert_response :not_found
+    end
+
+    should "be advertised on the owner page" do
+      get host_owner_path(@host.name, "owner1")
+      assert_response :success
+      assert_select 'link[rel="alternate"][type="application/atom+xml"][href=?]', feed_host_owner_url(@host, "owner1")
+    end
+  end
 end

@@ -1,5 +1,5 @@
 class RepositoriesController < ApplicationController
-  before_action :find_host, only: [:show, :index]
+  before_action :find_host, only: [:show, :index, :feed]
   skip_before_action :set_cache_headers, only: [:lookup]
 
   def lookup
@@ -71,5 +71,10 @@ class RepositoriesController < ApplicationController
 
   def index
     redirect_to host_path(@host)
+  end
+
+  def feed
+    @pagy, @repositories = pagy_countless(@host.repositories.visible.order(last_synced_at: :desc))
+    fresh_when @repositories, public: true
   end
 end
