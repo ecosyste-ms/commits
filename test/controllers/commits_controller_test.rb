@@ -54,6 +54,52 @@ class CommitsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "should sort commits by an allowed field and direction" do
+    older_commit = create(:commit, repository: @repository, sha: 'bead1234cafe5678', timestamp: 2.days.ago)
+
+    get host_repository_commits_url(@host, @repository, sort: 'timestamp', order: 'asc')
+    assert_response :success
+    assert_operator response.body.index(older_commit.sha[0..7]), :<, response.body.index(@commit.sha[0..7])
+  end
+
+  test "should default to newest commits first" do
+    older_commit = create(:commit, repository: @repository, sha: 'bead1234cafe5678', timestamp: 2.days.ago)
+
+    get host_repository_commits_url(@host, @repository)
+    assert_response :success
+    assert_operator response.body.index(@commit.sha[0..7]), :<, response.body.index(older_commit.sha[0..7])
+  end
+
+  test "should fall back to default sorting for an unknown sort field" do
+    older_commit = create(:commit, repository: @repository, sha: 'bead1234cafe5678', timestamp: 2.days.ago)
+
+    get host_repository_commits_url(@host, @repository, sort: 'message;drop', order: 'asc')
+    assert_response :success
+    assert_operator response.body.index(older_commit.sha[0..7]), :<, response.body.index(@commit.sha[0..7])
+  end
+
+  test "should fall back to descending order for an invalid direction" do
+    older_commit = create(:commit, repository: @repository, sha: 'bead1234cafe5678', timestamp: 2.days.ago)
+
+    get host_repository_commits_url(@host, @repository, sort: 'timestamp', order: 'sideways')
+    assert_response :success
+    assert_operator response.body.index(@commit.sha[0..7]), :<, response.body.index(older_commit.sha[0..7])
+  end
+
+  test "should return 404 for repository with hidden owner" do
+    create(:owner, host: @host, login: @repository.owner, hidden: true)
+
+    get host_repository_commits_url(@host, @repository)
+    assert_response :not_found
+  end
+
+  test "should return 404 when the hidden owner login differs in case" do
+    create(:owner, host: @host, login: @repository.owner.upcase, hidden: true)
+
+    get host_repository_commits_url(@host, @repository)
+    assert_response :not_found
+  end
+
   test "should display co-authors and signed-off-by when present" do
     message_with_metadata = "Fix critical bug\n\nCo-authored-by: Jane Doe <jane@example.com>\nCo-authored-by: Bob Smith <bob@example.com>\nSigned-off-by: Alice Johnson <alice@example.com>"
 
