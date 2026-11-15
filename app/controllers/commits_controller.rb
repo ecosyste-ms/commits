@@ -3,19 +3,18 @@ class CommitsController < ApplicationController
 
   def index
     @repository = @host.repositories.find_by!('lower(full_name) = ?', params[:repository_id].downcase)
+    raise ActiveRecord::RecordNotFound if @host.owner_hidden?(@repository.owner)
 
-    scope = @repository.commits.order('timestamp DESC')
+    scope = @repository.commits
 
     scope = scope.since(params[:since]) if params[:since].present?
     scope = scope.until(params[:until]) if params[:until].present?
 
-    if params[:sort].present? || params[:order].present?
-      sort = params[:sort] || 'timestamp'
-      order = params[:order] || 'desc'
-      sort_options = sort.split(',').zip(order.split(',')).to_h
-      scope = scope.order(sort_options)
+    sort = sanitize_sort(Commit.sortable_columns, default: 'timestamp')
+    if params[:order] == 'asc'
+      scope = scope.order(sort.asc)
     else
-      scope = scope.order('timestamp DESC')
+      scope = scope.order(sort.desc)
     end
 
     fresh_when scope, public: true
