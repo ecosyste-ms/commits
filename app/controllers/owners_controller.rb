@@ -25,7 +25,7 @@ class OwnersController < ApplicationController
   def feed
     @pagy, @repositories = pagy_countless(@host.repositories.owner(@owner).visible.order(last_synced_at: :desc))
     raise ActiveRecord::RecordNotFound if @repositories.empty?
-    render 'repositories/feed' if stale?(@repositories, public: true)
+    render 'repositories/feed' if stale?(etag: [@repositories, @repositories.map(&:last_synced_at)], public: true)
   end
 
   private

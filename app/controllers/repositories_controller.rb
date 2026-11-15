@@ -74,7 +74,7 @@ class RepositoriesController < ApplicationController
   end
 
   def feed
-    @pagy, @repositories = pagy_countless(@host.repositories.visible.order(last_synced_at: :desc))
-    fresh_when @repositories, public: true
+    @pagy, @repositories = pagy_countless(@host.repositories.visible.owner_visible.order(last_synced_at: :desc))
+    fresh_when etag: [@repositories, @repositories.map(&:last_synced_at)], public: true
   end
 end

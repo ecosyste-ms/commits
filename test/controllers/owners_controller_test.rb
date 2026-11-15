@@ -275,6 +275,16 @@ class OwnersControllerTest < ActionDispatch::IntegrationTest
       assert_response :not_modified
     end
 
+    should "not return not modified after only last_synced_at changes" do
+      get feed_host_owner_path(@host.name, "owner1")
+      etag = response.headers['ETag']
+
+      @owner1_repos.first.update_column(:last_synced_at, 1.minute.from_now)
+
+      get feed_host_owner_path(@host.name, "owner1"), headers: { 'HTTP_IF_NONE_MATCH' => etag }
+      assert_response :success
+    end
+
     should "return 404 for hidden owner" do
       @host.owners.find_by!(login: 'owner1').update!(hidden: true)
 

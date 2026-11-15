@@ -35,6 +35,9 @@ class Repository < ApplicationRecord
 
   scope :active, -> { where(status: nil) }
   scope :visible, -> { active.where.not(last_synced_at: nil).where.not(total_commits: nil) }
+  scope :owner_visible, -> {
+    where('NOT EXISTS (SELECT 1 FROM owners WHERE owners.host_id = repositories.host_id AND owners.login = repositories.owner AND owners.hidden = TRUE)')
+  }
   scope :created_after, ->(date) { where('created_at > ?', date) }
   scope :updated_after, ->(date) { where('updated_at > ?', date) }
   scope :owner, ->(owner) { where(owner: owner.downcase) }

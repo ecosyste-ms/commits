@@ -313,6 +313,40 @@ class RepositoriesControllerTest < ActionDispatch::IntegrationTest
       assert_match "Total Commits: #{@repository.total_commits}", content
     end
 
+    should "escape the html content of each entry" do
+      get feed_host_repositories_path(@host)
+      assert_response :success
+
+      feed = Nokogiri::XML(response.body)
+      feed.remove_namespaces!
+      content = feed.at_xpath('/feed/entry/content')
+      assert_equal 'html', content['type']
+      assert_empty content.element_children
+      assert_match "<p>Total Commits: #{@repository.total_commits}</p>", content.text
+    end
+
+    should "exclude repositories of hidden owners" do
+      hidden = create(:repository, :with_commits, host: @host, full_name: 'secret/repo', owner: 'secret')
+      create(:owner, host: @host, login: 'secret', hidden: true)
+
+      get feed_host_repositories_path(@host)
+      assert_response :success
+
+      titles = Nokogiri::XML(response.body).tap(&:remove_namespaces!).xpath('/feed/entry/title').map(&:text)
+      assert_includes titles, @repository.full_name
+      refute_includes titles, hidden.full_name
+    end
+
+    should "not return not modified after only last_synced_at changes" do
+      get feed_host_repositories_path(@host)
+      etag = response.headers['ETag']
+
+      @repository.update_column(:last_synced_at, 1.minute.from_now)
+
+      get feed_host_repositories_path(@host), headers: { 'HTTP_IF_NONE_MATCH' => etag }
+      assert_response :success
+    end
+
     should "order repositories by last_synced_at descending" do
       newer = create(:repository, :with_commits, host: @host, full_name: 'ecosyste-ms/newer', last_synced_at: 1.minute.ago)
       older = create(:repository, :with_commits, host: @host, full_name: 'ecosyste-ms/older', last_synced_at: 1.day.ago)

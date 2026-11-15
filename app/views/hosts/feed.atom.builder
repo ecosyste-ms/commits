@@ -8,11 +8,13 @@ atom_feed(language: 'en-US', id: feed_hosts_url, root_url: hosts_url) do |feed|
     feed.entry(host, url: host_url(host)) do |entry|
       entry.title host.name
       entry.content type: 'html' do |content|
-        content << content_tag(:p, "Kind: #{host.kind}") if host.kind.present?
-        content << content_tag(:p, "Repositories: #{number_with_delimiter host.repositories_count}")
-        content << content_tag(:p, "Commits: #{number_with_delimiter host.commits_count}")
-        content << content_tag(:p, "Committers: #{number_with_delimiter host.contributors_count}")
-        content << content_tag(:p, "Owners: #{number_with_delimiter host.owners_count}")
+        content.text! safe_join([
+          (content_tag(:p, "Kind: #{host.kind}") if host.kind.present?),
+          content_tag(:p, "Repositories: #{number_with_delimiter host.repositories_count}"),
+          content_tag(:p, "Commits: #{number_with_delimiter host.commits_count}"),
+          content_tag(:p, "Committers: #{number_with_delimiter host.contributors_count}"),
+          content_tag(:p, "Owners: #{number_with_delimiter host.owners_count}")
+        ].compact)
       end
     end
   end
