@@ -1,5 +1,6 @@
 <% @meta_title = "#{@host.to_s} : #{@owner} repositories" %>
 <% @meta_description = "List of repositories owned by #{@owner} on #{@host.to_s}" %>
+<% content_for :head, auto_discovery_link_tag(:atom, feed_host_owner_url(@host, @owner), title: "#{@host} : #{@owner} repositories") %>
 
 <div class="container-sm">
   <h1 class='mb-4'>

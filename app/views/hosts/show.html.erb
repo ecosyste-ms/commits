@@ -1,5 +1,6 @@
 <% @meta_title = @host.to_s %>
 <% @meta_description = "List of repositories on #{@host.to_s} that have had their commit history parsed" %>
+<% content_for :head, auto_discovery_link_tag(:atom, feed_host_repositories_url(@host), title: "#{@host} repositories") %>
 
 <div class="container-sm">
   <h1 class='mb-4'>
