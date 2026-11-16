@@ -4,12 +4,12 @@ class HostsController < ApplicationController
   def index
     @hosts = top_hosts
     fresh_when @hosts, public: true
-    @repositories = Repository.visible.order('last_synced_at DESC').includes(:host).limit(25)
+    @repositories = Repository.visible.owner_visible.order('last_synced_at DESC').includes(:host).limit(25)
   end
 
   def show
     fresh_when @host, public: true
-    scope = @host.repositories.visible
+    scope = @host.repositories.visible.owner_visible
 
     sort = sanitize_sort(Repository.sortable_columns, default: 'last_synced_at')
     if params[:order] == 'asc'
@@ -22,7 +22,7 @@ class HostsController < ApplicationController
   end
 
   def feed
-    @hosts = top_hosts
+    @hosts = Host.visible.order(created_at: :desc).limit(20)
     fresh_when @hosts, public: true
   end
 

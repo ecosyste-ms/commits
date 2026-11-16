@@ -64,6 +64,17 @@ class HostsControllerTest < ActionDispatch::IntegrationTest
       assert_response :success
     end
 
+    should "not list repositories of hidden owners" do
+      create(:owner, host: @host, login: 'secret', hidden: true)
+      hidden = create(:repository, :with_commits, host: @host, full_name: 'secret/repo', owner: 'secret')
+      shown = create(:repository, :with_commits, host: @host, full_name: 'public/repo', owner: 'public')
+
+      get hosts_path
+      assert_response :success
+      assert_match shown.full_name, response.body
+      assert_no_match hidden.full_name, response.body
+    end
+
     should "handle empty hosts list" do
       Host.destroy_all
       
@@ -103,6 +114,17 @@ class HostsControllerTest < ActionDispatch::IntegrationTest
       assert_response :success
       assert_match visible_repo.full_name, response.body
       assert_no_match invisible_repo.full_name, response.body
+    end
+
+    should "not list repositories of hidden owners" do
+      create(:owner, host: @host, login: 'secret', hidden: true)
+      hidden = create(:repository, :with_commits, host: @host, full_name: 'secret/repo', owner: 'secret')
+      shown = create(:repository, :with_commits, host: @host, full_name: 'public/repo', owner: 'public')
+
+      get host_path(@host.name)
+      assert_response :success
+      assert_match shown.full_name, response.body
+      assert_no_match hidden.full_name, response.body
     end
 
     should "support sorting repositories" do
@@ -223,9 +245,9 @@ class HostsControllerTest < ActionDispatch::IntegrationTest
       assert_match "Repositories: #{@host.repositories_count}", entry.at_xpath('content').text
     end
 
-    should "order hosts by repositories_count and limit to 20" do
+    should "order hosts by newest first and limit to 20" do
       create_list(:host, 25, repositories_count: 10, commits_count: 100)
-      top_host = create(:host, name: "TopHost", repositories_count: 10_000, commits_count: 5000)
+      newest_host = create(:host, name: "NewestHost", repositories_count: 1, commits_count: 1, created_at: 1.minute.from_now)
 
       get feed_hosts_path
       assert_response :success
@@ -234,7 +256,7 @@ class HostsControllerTest < ActionDispatch::IntegrationTest
       feed.remove_namespaces!
       entries = feed.xpath('/feed/entry/title').map(&:text)
       assert_equal 20, entries.length
-      assert_equal top_host.name, entries.first
+      assert_equal newest_host.name, entries.first
     end
 
     should "be advertised on the hosts page" do
