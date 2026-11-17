@@ -2,3 +2,4 @@ json.extract! repository, :id, :full_name, :default_branch, :total_commits, :tot
 json.committers defined?(@committers) ? @committers : repository.committers
 json.past_year_committers defined?(@past_year_committers) ? @past_year_committers : repository.past_year_committers
 json.commits_url api_v1_host_repository_commits_url(repository.host, repository)
+json.charts_url charts_api_v1_host_repository_url(repository.host, repository)

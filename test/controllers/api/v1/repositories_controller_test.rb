@@ -218,4 +218,149 @@ class ApiV1RepositoriesControllerTest < ActionDispatch::IntegrationTest
     end
     assert_response :not_found
   end
+
+  test 'get a repository includes the charts url' do
+    get api_v1_host_repository_path(host_id: @host.name, id: @repository.full_name)
+
+    assert_response :success
+    assert_equal charts_api_v1_host_repository_url(@host, @repository), JSON.parse(@response.body)['charts_url']
+  end
+
+  test 'charts returns monthly commit activity by default' do
+    @repository.commits.create!(sha: 'a1', timestamp: Time.utc(2024, 1, 3), author: 'Alice <alice@example.com>')
+    @repository.commits.create!(sha: 'a2', timestamp: Time.utc(2024, 1, 20), author: 'Alice <alice@example.com>')
+    @repository.commits.create!(sha: 'b1', timestamp: Time.utc(2024, 1, 25), author: 'Bob <bob@example.com>')
+    @repository.commits.create!(sha: 'b2', timestamp: Time.utc(2024, 3, 5), author: 'Bob <bob@example.com>')
+
+    get charts_api_v1_host_repository_path(host_id: @host.name, id: @repository.full_name)
+
+    assert_response :success
+    assert_template 'repositories/charts', file: 'repositories/charts.json.jbuilder'
+
+    actual_response = JSON.parse(@response.body)
+
+    assert_equal 'month', actual_response['period']
+    assert_equal({ '2024-01-01' => 3, '2024-02-01' => 0, '2024-03-01' => 1 }, actual_response['commits'])
+    assert_equal({ '2024-01-01' => 2, '2024-02-01' => 0, '2024-03-01' => 1 }, actual_response['committers'])
+    assert_equal({ '2024-01-01' => 1.5, '2024-02-01' => 0, '2024-03-01' => 1.0 }, actual_response['average_commits_per_committer'])
+  end
+
+  test 'charts groups commit activity by the requested period' do
+    @repository.commits.create!(sha: 'a1', timestamp: Time.utc(2023, 6, 1), author: 'Alice <alice@example.com>')
+    @repository.commits.create!(sha: 'a2', timestamp: Time.utc(2024, 2, 1), author: 'Alice <alice@example.com>')
+
+    get charts_api_v1_host_repository_path(host_id: @host.name, id: @repository.full_name, period: 'year')
+
+    assert_response :success
+    actual_response = JSON.parse(@response.body)
+    assert_equal 'year', actual_response['period']
+    assert_equal({ '2023-01-01' => 1, '2024-01-01' => 1 }, actual_response['commits'])
+  end
+
+  test 'charts falls back to monthly activity for an unknown period' do
+    @repository.commits.create!(sha: 'a1', timestamp: Time.utc(2024, 1, 3), author: 'Alice <alice@example.com>')
+
+    get charts_api_v1_host_repository_path(host_id: @host.name, id: @repository.full_name, period: 'fortnight')
+
+    assert_response :success
+    actual_response = JSON.parse(@response.body)
+    assert_equal 'month', actual_response['period']
+    assert_equal({ '2024-01-01' => 1 }, actual_response['commits'])
+  end
+
+  test 'charts filters commit activity by since and until' do
+    @repository.commits.create!(sha: 'a1', timestamp: Time.utc(2024, 1, 3), author: 'Alice <alice@example.com>')
+    @repository.commits.create!(sha: 'a2', timestamp: Time.utc(2024, 2, 3), author: 'Alice <alice@example.com>')
+    @repository.commits.create!(sha: 'a3', timestamp: Time.utc(2024, 3, 3), author: 'Alice <alice@example.com>')
+
+    get charts_api_v1_host_repository_path(
+      host_id: @host.name,
+      id: @repository.full_name,
+      since: '2024-02-01T00:00:00Z',
+      until: '2024-03-01T00:00:00Z'
+    )
+
+    assert_response :success
+    assert_equal({ '2024-02-01' => 1 }, JSON.parse(@response.body)['commits'])
+  end
+
+  test 'charts returns empty series for a repository without stored commits' do
+    get charts_api_v1_host_repository_path(host_id: @host.name, id: @repository.full_name)
+
+    assert_response :success
+    actual_response = JSON.parse(@response.body)
+    assert_equal({}, actual_response['commits'])
+    assert_equal({}, actual_response['committers'])
+    assert_equal({}, actual_response['average_commits_per_committer'])
+  end
+
+  test 'charts accepts an unescaped repository name' do
+    @repository.commits.create!(sha: 'a1', timestamp: Time.utc(2024, 1, 3), author: 'Alice <alice@example.com>')
+
+    get "/api/v1/hosts/#{@host.name}/repositories/#{@repository.full_name}/charts?period=year"
+
+    assert_response :success
+    assert_equal({ '2024-01-01' => 1 }, JSON.parse(@response.body)['commits'])
+  end
+
+  test 'charts finds a repository case insensitively' do
+    @repository.commits.create!(sha: 'a1', timestamp: Time.utc(2024, 1, 3), author: 'Alice <alice@example.com>')
+
+    get charts_api_v1_host_repository_path(host_id: @host.name, id: 'Ecosyste-MS/Repos')
+
+    assert_response :success
+    assert_equal({ '2024-01-01' => 1 }, JSON.parse(@response.body)['commits'])
+  end
+
+  test 'charts returns not modified for a matching etag' do
+    get charts_api_v1_host_repository_path(host_id: @host.name, id: @repository.full_name)
+    assert_response :success
+
+    get charts_api_v1_host_repository_path(host_id: @host.name, id: @repository.full_name),
+      headers: { 'If-None-Match' => response.headers['ETag'] }
+
+    assert_response :not_modified
+  end
+
+  test 'charts returns accepted while the repository is pending' do
+    repository = @host.repositories.create!(full_name: 'owner/pending-repo')
+
+    get charts_api_v1_host_repository_path(host_id: @host.name, id: repository.full_name)
+
+    assert_response :accepted
+    assert_equal 'pending', JSON.parse(response.body)['status']
+    assert_equal '60', response.headers['Retry-After']
+  end
+
+  test 'charts returns 404 for an unknown repository' do
+    assert_no_difference 'Repository.count' do
+      get charts_api_v1_host_repository_path(host_id: @host.name, id: 'owner/unknown-repo')
+    end
+
+    assert_response :not_found
+  end
+
+  test 'charts returns 404 for a hidden owner' do
+    Owner.create!(host: @host, login: 'ecosyste-ms', hidden: true)
+
+    get charts_api_v1_host_repository_path(host_id: @host.name, id: @repository.full_name)
+
+    assert_response :not_found
+  end
+
+  test 'charts redirects mixed case host names to lowercase' do
+    get charts_api_v1_host_repository_path(host_id: @host.name.upcase, id: @repository.full_name, period: 'year')
+
+    assert_response :moved_permanently
+    assert_redirected_to charts_api_v1_host_repository_path(@host.name, @repository.full_name, period: 'year')
+  end
+
+  test 'a repository named charts is still served by show' do
+    repository = @host.repositories.create!(full_name: 'owner/charts', last_synced_at: Time.now, total_commits: 1, total_committers: 1)
+
+    get "/api/v1/hosts/#{@host.name}/repositories/owner/charts"
+
+    assert_response :success
+    assert_equal 'owner/charts', JSON.parse(@response.body)['full_name']
+  end
 end

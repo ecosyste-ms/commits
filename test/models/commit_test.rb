@@ -313,4 +313,54 @@ class CommitTest < ActiveSupport::TestCase
     assert_includes co_authored, commit_with
     assert_not_includes co_authored, commit_without
   end
+
+  context 'chart_data' do
+    setup do
+      host = Host.create!(name: 'github.com', url: 'https://github.com', kind: 'github')
+      @repository = Repository.create!(full_name: 'test/repo', host: host)
+    end
+
+    should 'count commits and distinct committers per period' do
+      create(:commit, repository: @repository, timestamp: Time.utc(2024, 1, 3), author: 'Alice <alice@example.com>')
+      create(:commit, repository: @repository, timestamp: Time.utc(2024, 1, 20), author: 'Alice <alice@example.com>')
+      create(:commit, repository: @repository, timestamp: Time.utc(2024, 1, 31), author: 'Bob <bob@example.com>')
+      create(:commit, repository: @repository, timestamp: Time.utc(2024, 3, 5), author: 'Bob <bob@example.com>')
+
+      data = @repository.commits.chart_data('month')
+
+      assert_equal({ Date.new(2024, 1, 1) => 3, Date.new(2024, 2, 1) => 0, Date.new(2024, 3, 1) => 1 }, data[:commits])
+      assert_equal({ Date.new(2024, 1, 1) => 2, Date.new(2024, 2, 1) => 0, Date.new(2024, 3, 1) => 1 }, data[:committers])
+      assert_equal({ Date.new(2024, 1, 1) => 1.5, Date.new(2024, 2, 1) => 0, Date.new(2024, 3, 1) => 1.0 }, data[:average_commits_per_committer])
+    end
+
+    should 'group by year' do
+      create(:commit, repository: @repository, timestamp: Time.utc(2022, 6, 1), author: 'Alice <alice@example.com>')
+      create(:commit, repository: @repository, timestamp: Time.utc(2023, 2, 1), author: 'Alice <alice@example.com>')
+      create(:commit, repository: @repository, timestamp: Time.utc(2023, 9, 1), author: 'Bob <bob@example.com>')
+
+      data = @repository.commits.chart_data('year')
+
+      assert_equal({ Date.new(2022, 1, 1) => 1, Date.new(2023, 1, 1) => 2 }, data[:commits])
+      assert_equal({ Date.new(2022, 1, 1) => 1, Date.new(2023, 1, 1) => 2 }, data[:committers])
+    end
+
+    should 'only include commits in the current scope' do
+      other_repository = Repository.create!(full_name: 'test/other', host: @repository.host)
+      create(:commit, repository: @repository, timestamp: Time.utc(2024, 1, 3))
+      create(:commit, repository: other_repository, timestamp: Time.utc(2024, 1, 3))
+      create(:commit, repository: @repository, timestamp: Time.utc(2024, 5, 3))
+
+      data = @repository.commits.since(Time.utc(2024, 4, 1)).chart_data('month')
+
+      assert_equal({ Date.new(2024, 5, 1) => 1 }, data[:commits])
+    end
+
+    should 'return empty series when there are no commits' do
+      data = @repository.commits.chart_data('month')
+
+      assert_equal({}, data[:commits])
+      assert_equal({}, data[:committers])
+      assert_equal({}, data[:average_commits_per_committer])
+    end
+  end
 end

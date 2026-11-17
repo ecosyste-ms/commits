@@ -1,5 +1,5 @@
 class Api::V1::RepositoriesController < Api::V1::ApplicationController
-  before_action :find_host, only: [:index, :show, :ping]
+  before_action :find_host, only: [:index, :show, :charts, :ping]
   skip_before_action :set_cache_headers, only: [:lookup, :ping]
   skip_before_action :set_api_cache_headers, only: [:lookup, :ping]
 
@@ -89,6 +89,22 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
     @past_year_committers = (@repository.past_year_committers || []).reject do |c|
       hidden_logins.include?(c['login']) || hidden_emails.include?(c['email'])
     end
+  end
+
+  def charts
+    @repository = @host.repositories.find_by!('lower(full_name) = ?', params[:id].downcase)
+    raise ActiveRecord::RecordNotFound if @repository.owner_hidden?
+    return render_pending_repository(@repository) if @repository.sync_pending?
+
+    return unless stale?(@repository, public: true)
+
+    @period = Commit::CHART_PERIODS.include?(params[:period]) ? params[:period] : 'month'
+
+    scope = @repository.commits
+    scope = scope.since(params[:since]) if params[:since].present?
+    scope = scope.until(params[:until]) if params[:until].present?
+
+    @chart_data = scope.chart_data(@period)
   end
 
   def ping

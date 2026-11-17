@@ -12,6 +12,12 @@ The default rate limit for the API is 5000/req per hour based on your IP address
 
 Forks get commit and committer totals, but their individual commits are not stored, so the commits list for a fork is empty. The same applies to repositories with over 50,000 commits, 10 or fewer committers and a development distribution score below 0.1, which are almost always generated data such as proxy lists or status logs.
 
+## Charts
+
+Commit activity over time for a repository is available from `https://commits.ecosyste.ms/api/v1/hosts/:host/repositories/:owner/:name/charts`. It returns the number of commits, the number of distinct committers and the average commits per committer for each period, keyed by the date the period starts (weeks start on Sunday). Periods with no commits between the first and last commit are included as zero.
+
+Use `period` to choose `day`, `week`, `month` (the default), `quarter` or `year`, and `since`/`until` to limit the time range. The series are built from stored commits, so they are empty for forks and other repositories whose commits are not stored.
+
 ## Feeds
 
 Atom feeds are available for the list pages and are advertised with `<link rel="alternate">` tags in the HTML:

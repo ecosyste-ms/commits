@@ -1,4 +1,6 @@
 class Commit < ApplicationRecord
+  CHART_PERIODS = %w[day week month quarter year].freeze
+
   def self.sortable_columns
     {
       'timestamp' => 'timestamp',
@@ -18,6 +20,21 @@ class Commit < ApplicationRecord
   scope :with_co_author, -> { where.not(co_author_email: nil) }
   
   before_save :extract_co_author_email
+
+  def self.chart_data(period)
+    commits = group_by_period(period, :timestamp).count
+    committers = group_by_period(period, :timestamp).distinct.count(:author)
+    average_commits_per_committer = commits.to_h do |date, count|
+      committer_count = committers[date].to_i
+      [date, committer_count.positive? ? count.fdiv(committer_count).round(2) : 0]
+    end
+
+    {
+      commits: commits,
+      committers: committers,
+      average_commits_per_committer: average_commits_per_committer
+    }
+  end
 
   def labelled_stats
     {

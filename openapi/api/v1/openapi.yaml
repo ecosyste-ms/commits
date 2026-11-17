@@ -236,6 +236,52 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Commit"
+  /hosts/{hostName}/repositories/{repoName}/charts:
+    get:
+      summary: get commit activity over time for a repository
+      operationId: getRepositoryCharts
+      parameters:
+        - in: path
+          name: hostName
+          schema:
+            type: string
+          required: true
+          description: name of host
+        - in: path
+          name: repoName
+          schema:
+            type: string
+          required: true
+          description: name of repository
+        - name: period
+          in: query
+          description: length of each period, defaults to month
+          required: false
+          schema:
+            type: string
+            enum: [day, week, month, quarter, year]
+            default: month
+        - name: since
+          in: query
+          description: only count commits since given time
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: until
+          in: query
+          description: only count commits until given time
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        200:
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CommitCharts"
   /hosts/{hostName}/committers/{login}:
     get:
       summary: get a committer from a host
@@ -341,6 +387,29 @@ components:
           format: date-time
         commits_url:
           type: string
+        charts_url:
+          type: string
+    CommitCharts:
+      type: object
+      properties:
+        period:
+          type: string
+          enum: [day, week, month, quarter, year]
+        commits:
+          type: object
+          description: number of commits in each period, keyed by the date the period starts
+          additionalProperties:
+            type: integer
+        committers:
+          type: object
+          description: number of distinct commit authors in each period, keyed by the date the period starts
+          additionalProperties:
+            type: integer
+        average_commits_per_committer:
+          type: object
+          description: commits divided by committers in each period, keyed by the date the period starts
+          additionalProperties:
+            type: number
     Commit:
       type: object
       properties:

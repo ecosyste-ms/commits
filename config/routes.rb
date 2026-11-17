@@ -21,6 +21,7 @@ Rails.application.routes.draw do
         resources :repositories, constraints: { id: /.*/ }, only: [:index, :show] do
           member do
             get 'ping', to: 'repositories#ping'
+            get 'charts', to: 'repositories#charts', constraints: { id: /[^\/]+(?:\/|%2F).+/i }
           end
           resources :commits, only: [:index]
         end
