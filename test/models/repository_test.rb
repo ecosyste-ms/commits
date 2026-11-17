@@ -926,6 +926,14 @@ Co-authored-by: Second <second@example.com>" 2>&1`
     end
   end
 
+  test "sync_all skips repositories whose hidden owner login differs in case" do
+    Owner.create!(host: @host, login: 'Test', hidden: true)
+    @repository.expects(:sync_details).never
+    @repository.expects(:clone_repository).never
+
+    @repository.sync_all
+  end
+
   test "sync_all keeps totals for forks without storing their commits" do
     Dir.mktmpdir do |source_dir|
       `git init #{source_dir} 2>&1`
@@ -1114,6 +1122,32 @@ Co-authored-by: Claude <noreply@anthropic.com>" 2>&1`
     should 'return false for repository with nil hidden owner' do
       Owner.create!(host: @host, login: 'test', hidden: nil)
       assert_equal false, @repository.owner_hidden?
+    end
+
+    should 'return true when the hidden owner login differs in case' do
+      Owner.create!(host: @host, login: 'Test', hidden: true)
+      assert_equal true, @repository.owner_hidden?
+    end
+
+    should 'return true when a visible owner record with a different case also exists' do
+      Owner.create!(host: @host, login: 'Test', hidden: true)
+      Owner.create!(host: @host, login: 'test', hidden: false)
+      assert_equal true, @repository.owner_hidden?
+    end
+
+    should 'return false for a hidden owner on another host' do
+      other_host = Host.create!(name: 'gitlab.com', url: 'https://gitlab.com', kind: 'gitlab')
+      Owner.create!(host: other_host, login: 'test', hidden: true)
+      assert_equal false, @repository.owner_hidden?
+    end
+  end
+
+  context 'owner_visible' do
+    should 'exclude repositories whose hidden owner login differs in case' do
+      Owner.create!(host: @host, login: 'Test', hidden: true)
+      visible = Repository.create!(full_name: 'someone/repo', host: @host)
+
+      assert_equal [visible], @host.repositories.owner_visible.to_a
     end
   end
 

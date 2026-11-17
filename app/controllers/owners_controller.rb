@@ -32,7 +32,6 @@ class OwnersController < ApplicationController
 
   def find_owner
     @owner = params[:id]
-    owner_record = @host.owners.find_by(login: @owner.downcase)
-    raise ActiveRecord::RecordNotFound if owner_record&.hidden?
+    raise ActiveRecord::RecordNotFound if @host.owner_hidden?(@owner)
   end
 end

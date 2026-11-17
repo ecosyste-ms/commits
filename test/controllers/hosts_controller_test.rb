@@ -127,6 +127,17 @@ class HostsControllerTest < ActionDispatch::IntegrationTest
       assert_no_match hidden.full_name, response.body
     end
 
+    should "not list repositories of hidden owners whose login differs in case" do
+      create(:owner, host: @host, login: 'Secret', hidden: true)
+      hidden = create(:repository, :with_commits, host: @host, full_name: 'secret/repo', owner: 'secret')
+      shown = create(:repository, :with_commits, host: @host, full_name: 'public/repo', owner: 'public')
+
+      get host_path(@host.name)
+      assert_response :success
+      assert_match shown.full_name, response.body
+      assert_no_match hidden.full_name, response.body
+    end
+
     should "support sorting repositories" do
       repo_a = create(:repository, :with_commits, host: @host, full_name: "owner/aaa", stargazers_count: 100)
       repo_z = create(:repository, :with_commits, host: @host, full_name: "owner/zzz", stargazers_count: 200)
