@@ -97,6 +97,12 @@ class RepositoriesControllerTest < ActionDispatch::IntegrationTest
       assert_response :not_found
     end
 
+    should "return 404 for repository whose hidden owner login differs in case" do
+      create(:owner, host: @host, login: 'Ecosyste-MS', hidden: true)
+      get host_repository_path(host_id: @host.name, id: @repository.full_name)
+      assert_response :not_found
+    end
+
     should "set proper cache headers" do
       get host_repository_path(host_id: @host.name, id: @repository.full_name)
       assert_response :success
@@ -328,6 +334,18 @@ class RepositoriesControllerTest < ActionDispatch::IntegrationTest
     should "exclude repositories of hidden owners" do
       hidden = create(:repository, :with_commits, host: @host, full_name: 'secret/repo', owner: 'secret')
       create(:owner, host: @host, login: 'secret', hidden: true)
+
+      get feed_host_repositories_path(@host)
+      assert_response :success
+
+      titles = Nokogiri::XML(response.body).tap(&:remove_namespaces!).xpath('/feed/entry/title').map(&:text)
+      assert_includes titles, @repository.full_name
+      refute_includes titles, hidden.full_name
+    end
+
+    should "exclude repositories whose hidden owner login differs in case" do
+      hidden = create(:repository, :with_commits, host: @host, full_name: 'secret/repo', owner: 'secret')
+      create(:owner, host: @host, login: 'Secret', hidden: true)
 
       get feed_host_repositories_path(@host)
       assert_response :success

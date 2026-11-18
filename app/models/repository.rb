@@ -36,7 +36,7 @@ class Repository < ApplicationRecord
   scope :active, -> { where(status: nil) }
   scope :visible, -> { active.where.not(last_synced_at: nil).where.not(total_commits: nil) }
   scope :owner_visible, -> {
-    where('NOT EXISTS (SELECT 1 FROM owners WHERE owners.host_id = repositories.host_id AND owners.login = repositories.owner AND owners.hidden = TRUE)')
+    where('NOT EXISTS (SELECT 1 FROM owners WHERE owners.host_id = repositories.host_id AND lower(owners.login) = repositories.owner AND owners.hidden = TRUE)')
   }
   scope :created_after, ->(date) { where('created_at > ?', date) }
   scope :updated_after, ->(date) { where('updated_at > ?', date) }
@@ -140,14 +140,8 @@ class Repository < ApplicationRecord
     read_attribute(:owner) || full_name.split('/').first
   end
 
-  def owner_record
-    return nil if owner.blank?
-    host.owners.find_by(login: owner)
-  end
-
   def owner_hidden?
-    return false if owner.blank?
-    owner_record&.hidden? == true
+    host.owner_hidden?(owner)
   end
 
   def hidden_committer_emails

@@ -111,6 +111,14 @@ class OwnersControllerTest < ActionDispatch::IntegrationTest
       assert_no_match "owner1", response.body
       assert_match "owner2", response.body
     end
+
+    should "exclude owners hidden under a login with different case from index" do
+      create(:owner, host: @host, login: 'Owner1', hidden: true)
+      get host_owners_path(@host.name)
+      assert_response :success
+      assert_no_match(/owner1/i, response.body)
+      assert_match "owner2", response.body
+    end
   end
 
   context "GET #show" do
@@ -203,6 +211,12 @@ class OwnersControllerTest < ActionDispatch::IntegrationTest
       assert_response :not_found
     end
 
+    should "return 404 for hidden owner whose login differs in case" do
+      create(:owner, host: @host, login: 'Owner1', hidden: true)
+      get host_owner_path(@host.name, "owner1")
+      assert_response :not_found
+    end
+
     should "return 404 for non-existent host" do
       get host_owner_path("NonExistentHost", "owner1")
       assert_response :not_found
@@ -287,6 +301,13 @@ class OwnersControllerTest < ActionDispatch::IntegrationTest
 
     should "return 404 for hidden owner" do
       @host.owners.find_by!(login: 'owner1').update!(hidden: true)
+
+      get feed_host_owner_path(@host.name, "owner1")
+      assert_response :not_found
+    end
+
+    should "return 404 for hidden owner whose login differs in case" do
+      create(:owner, host: @host, login: 'Owner1', hidden: true)
 
       get feed_host_owner_path(@host.name, "owner1")
       assert_response :not_found

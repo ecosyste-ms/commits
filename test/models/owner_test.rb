@@ -31,6 +31,16 @@ class OwnerTest < ActiveSupport::TestCase
     assert_not_includes visible_owners, hidden_owner
   end
 
+  test "visible scope excludes owners hidden under a login with different case" do
+    shadowed_owner = Owner.create!(host: @host, login: "secret", hidden: false)
+    Owner.create!(host: @host, login: "Secret", hidden: true)
+    other_host_owner = Owner.create!(host: create(:host, :gitlab), login: "secret", hidden: false)
+
+    visible_owners = Owner.visible
+    assert_not_includes visible_owners, shadowed_owner
+    assert_includes visible_owners, other_host_owner
+  end
+
   test "hidden scope only includes hidden owners" do
     visible_owner = Owner.create!(host: @host, login: "visible", hidden: false)
     hidden_owner = Owner.create!(host: @host, login: "hidden", hidden: true)
