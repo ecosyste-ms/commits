@@ -17,7 +17,7 @@ class CommitsController < ApplicationController
       scope = scope.order(sort.desc)
     end
 
-    fresh_when scope, public: true
     @pagy, @commits = pagy_countless(scope)
+    fresh_when @commits, public: true
   end
 end
