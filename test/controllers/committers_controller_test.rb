@@ -134,6 +134,18 @@ class CommittersControllerTest < ActionDispatch::IntegrationTest
       assert response.headers["Cache-Control"].present?
       assert_match "public", response.headers["Cache-Control"]
     end
+
+    should "build the etag from the current page without aggregating every committer" do
+      assert_no_queries_match(/COUNT\(\*\)|MAX\(/i) do
+        get host_committers_path(@host.name), params: { per_page: 1 }
+      end
+      assert_response :success
+      etag = response.headers["ETag"]
+      assert etag.present?
+
+      get host_committers_path(@host.name), params: { per_page: 1 }, headers: { "HTTP_IF_NONE_MATCH" => etag }
+      assert_response :not_modified
+    end
   end
 
   context "GET #show" do

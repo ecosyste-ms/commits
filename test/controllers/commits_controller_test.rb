@@ -39,6 +39,20 @@ class CommitsControllerTest < ActionDispatch::IntegrationTest
     assert_response :success
   end
 
+  test "should build the etag from the current page without aggregating every commit" do
+    create(:commit, repository: @repository, timestamp: 2.days.ago)
+
+    assert_no_queries_match(/COUNT\(\*\)|MAX\(/i) do
+      get host_repository_commits_url(@host, @repository, per_page: 1)
+    end
+    assert_response :success
+    etag = response.headers['ETag']
+    assert etag.present?
+
+    get host_repository_commits_url(@host, @repository, per_page: 1), headers: { 'HTTP_IF_NONE_MATCH' => etag }
+    assert_response :not_modified
+  end
+
   test "should handle since parameter" do
     get host_repository_commits_url(@host, @repository, since: 1.week.ago)
     assert_response :success
