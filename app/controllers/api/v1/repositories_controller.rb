@@ -4,17 +4,15 @@ class Api::V1::RepositoriesController < Api::V1::ApplicationController
   skip_before_action :set_api_cache_headers, only: [:lookup, :ping]
 
   def index
-    scope = @host.repositories.visible.order('last_synced_at DESC').includes(:host)
+    scope = @host.repositories.visible.owner_visible.includes(:host)
     scope = scope.created_after(params[:created_after]) if params[:created_after].present?
     scope = scope.updated_after(params[:updated_after]) if params[:updated_after].present?
 
-    if params[:sort].present? || params[:order].present?
-      sort = params[:sort] || 'last_synced_at'
-      order = params[:order] || 'desc'
-      sort_options = sort.split(',').zip(order.split(',')).to_h
-      scope = scope.order(sort_options)
+    sort = sanitize_sort(Repository.sortable_columns, default: 'last_synced_at')
+    if params[:order] == 'asc'
+      scope = scope.order(sort.asc)
     else
-      scope = scope.order('last_synced_at DESC')
+      scope = scope.order(sort.desc)
     end
 
     @pagy, @repositories = pagy_countless(scope)

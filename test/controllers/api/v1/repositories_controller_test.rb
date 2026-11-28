@@ -16,6 +16,53 @@ class ApiV1RepositoriesControllerTest < ActionDispatch::IntegrationTest
     assert_equal actual_response.length, 1
   end
 
+  test 'list repositories leaves out repositories of hidden owners' do
+    @host.repositories.create!(full_name: 'hidden-owner/repo', last_synced_at: Time.now, total_commits: 10)
+    Owner.create!(host: @host, login: 'hidden-owner', hidden: true)
+
+    get api_v1_host_repositories_path(host_id: @host.name)
+
+    assert_response :success
+    assert_equal [@repository.full_name], response.parsed_body.pluck('full_name')
+  end
+
+  test 'list repositories leaves out repositories whose hidden owner login differs in case' do
+    @host.repositories.create!(full_name: 'hidden-owner/repo', last_synced_at: Time.now, total_commits: 10)
+    Owner.create!(host: @host, login: 'Hidden-Owner', hidden: true)
+
+    get api_v1_host_repositories_path(host_id: @host.name)
+
+    assert_response :success
+    assert_equal [@repository.full_name], response.parsed_body.pluck('full_name')
+  end
+
+  test 'sort repositories by an allowed field and direction' do
+    smaller = @host.repositories.create!(full_name: 'ecosyste-ms/smaller', last_synced_at: 1.day.ago, total_commits: 50)
+
+    get api_v1_host_repositories_path(host_id: @host.name, sort: 'total_commits', order: 'asc')
+
+    assert_response :success
+    assert_equal [smaller.full_name, @repository.full_name], response.parsed_body.pluck('full_name')
+  end
+
+  test 'fall back to default sorting for an unknown repository sort field' do
+    smaller = @host.repositories.create!(full_name: 'ecosyste-ms/smaller', last_synced_at: 1.day.ago, total_commits: 50)
+
+    get api_v1_host_repositories_path(host_id: @host.name, sort: 'nonexistent', order: 'asc')
+
+    assert_response :success
+    assert_equal [smaller.full_name, @repository.full_name], response.parsed_body.pluck('full_name')
+  end
+
+  test 'fall back to descending order for an invalid repository sort direction' do
+    smaller = @host.repositories.create!(full_name: 'ecosyste-ms/smaller', last_synced_at: 1.day.ago, total_commits: 50)
+
+    get api_v1_host_repositories_path(host_id: @host.name, sort: 'total_commits', order: 'sideways')
+
+    assert_response :success
+    assert_equal [@repository.full_name, smaller.full_name], response.parsed_body.pluck('full_name')
+  end
+
   test 'redirect uppercase host names to lowercase for repositories list' do
     get api_v1_host_repositories_path(host_id: @host.name.upcase)
     assert_response :moved_permanently
